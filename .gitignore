@@ -1,2 +1,7 @@
+# Project files
 /piggy/data/
 .idea/
+
+# Python cache files
+__pycache__/
+*.pyc
