@@ -28,11 +28,14 @@ def get_input(prompt: str, default: str | None = None) -> str | None:
     user_input = input(f"{prompt}: ").strip()
     return user_input if user_input else None
 
+
 @overload
 def get_decimal_input(prompt: str, default: Decimal) -> Decimal: ...
 
+
 @overload
 def get_decimal_input(prompt: str, default: None = None) -> Decimal | None: ...
+
 
 def get_decimal_input(prompt: str, default: Decimal | None = None) -> Decimal | None:
     """
