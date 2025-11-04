@@ -1,16 +1,13 @@
 from datetime import date, timedelta
-from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from piggy.utils.input import get_input, get_decimal_input, get_date_input, get_int_input
-from piggy.installment_plan import (
-    InstallmentPlan, Installment, PaymentStatus, build_installment_plan
-)
+from piggy.installment_plan import InstallmentPlan, PaymentStatus
 from piggy.menu import (
     MenuInterface, NavigationContext, Menu, Command, CommandResult,
     NavigationAction
 )
+from piggy.utils.input import get_input, get_decimal_input, get_date_input, get_int_input
 
 PLANS_STORAGE: dict[str, InstallmentPlan] = {}
 STORAGE_DIR = Path("data")
@@ -70,7 +67,7 @@ def create_installment_plan(_context: NavigationContext) -> CommandResult:
         return CommandResult(message="First payment date is required.")
 
     try:
-        plan = build_installment_plan(
+        plan = InstallmentPlan.build(
             merchant_name=merchant_name,
             total_amount=total_amount,
             purchase_date=purchase_date,
@@ -194,23 +191,16 @@ def mark_payment(_context: NavigationContext) -> CommandResult:
     except ValueError:
         return CommandResult(message="Invalid input. Please use comma-separated numbers.")
 
-    selected_installments = []
-    valid_numbers = {inst.installment_number for inst in plan.installments}
+    try:
+        selected_installments = plan.get_installments(selected_numbers)
+    except ValueError as e:
+        return CommandResult(message=str(e))
 
-    for num in selected_numbers:
-        if num not in valid_numbers:
-            return CommandResult(message=f"Installment #{num} does not exist.")
-        for inst in plan.installments:
-            if inst.installment_number == num:
-                if mark_as_paid and inst.status == PaymentStatus.PAID:
-                    print(f"Note: Installment #{num} is already marked as paid.")
-                elif not mark_as_paid and inst.status != PaymentStatus.PAID:
-                    print(f"Note: Installment #{num} is already marked as unpaid.")
-                selected_installments.append(inst)
-                break
-
-    if not selected_installments:
-        return CommandResult(message="No valid installments selected.")
+    for inst in selected_installments:
+        if mark_as_paid and inst.status == PaymentStatus.PAID:
+            print(f"Note: Installment #{inst.installment_number} is already marked as paid.")
+        elif not mark_as_paid and inst.status != PaymentStatus.PAID:
+            print(f"Note: Installment #{inst.installment_number} is already marked as unpaid.")
 
     marked_count = 0
     if mark_as_paid:

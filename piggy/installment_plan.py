@@ -99,6 +99,74 @@ class InstallmentPlan(BaseModel):
             return None
         return min(inst.due_date for inst in unpaid)
 
+    def get_installments(self, numbers: list[int] | None = None) -> list[Installment]:
+        """
+        Get installments by installment number.
+
+        :param numbers: List of installment numbers (not list indices) to retrieve. If None, returns all installments.
+        :return: List of Installment objects
+        :raises ValueError: If any installment number does not exist
+        """
+        if numbers is None:
+            return self.installments
+
+        lookup = {inst.installment_number: inst for inst in self.installments}
+        result = []
+
+        for num in numbers:
+            if num not in lookup:
+                raise ValueError(f"Installment #{num} does not exist.")
+            result.append(lookup[num])
+
+        return result
+
+    @staticmethod
+    def build(
+        merchant_name: str,
+        total_amount: Decimal,
+        purchase_date: date,
+        num_installments: int,
+        days_between: int,
+        first_payment_date: date
+    ) -> 'InstallmentPlan':
+        """
+        Build an installment plan with calculated installments.
+
+        Creates an InstallmentPlan with evenly divided payments scheduled at
+        regular intervals.
+
+        :param merchant_name: Name of the merchant
+        :param total_amount: Total purchase amount
+        :param purchase_date: Date of purchase
+        :param num_installments: Number of installment payments
+        :param days_between: Days between each payment
+        :param first_payment_date: Date of first payment
+        :return: Validated InstallmentPlan instance
+        :raises ValueError: If validation fails
+        """
+        from datetime import timedelta
+
+        installment_amount = total_amount / num_installments
+        installments = []
+        current_date = first_payment_date
+
+        for i in range(1, num_installments + 1):
+            installment = Installment(
+                installment_number=i,
+                amount=installment_amount,
+                due_date=current_date,
+                status=PaymentStatus.PENDING
+            )
+            installments.append(installment)
+            current_date += timedelta(days=days_between)
+
+        return InstallmentPlan(
+            merchant_name=merchant_name,
+            total_amount=total_amount,
+            purchase_date=purchase_date,
+            installments=installments
+        )
+
     def to_json(self, file_path: Optional[str] = None) -> str:
         """Serialize the installment plan to JSON format"""
         json_data = self.model_dump(mode='json')
@@ -152,50 +220,3 @@ class InstallmentPlan(BaseModel):
                     inst.status.value,
                     inst.paid_date.isoformat() if inst.paid_date else ''
                 ])
-
-
-def build_installment_plan(
-    merchant_name: str,
-    total_amount: Decimal,
-    purchase_date: date,
-    num_installments: int,
-    days_between: int,
-    first_payment_date: date
-) -> InstallmentPlan:
-    """
-    Build an installment plan with calculated installments.
-
-    Creates an InstallmentPlan with evenly divided payments scheduled at
-    regular intervals.
-
-    :param merchant_name: Name of the merchant
-    :param total_amount: Total purchase amount
-    :param purchase_date: Date of purchase
-    :param num_installments: Number of installment payments
-    :param days_between: Days between each payment
-    :param first_payment_date: Date of first payment
-    :return: Validated InstallmentPlan instance
-    :raises ValueError: If validation fails
-    """
-    from datetime import timedelta
-
-    installment_amount = total_amount / num_installments
-    installments = []
-    current_date = first_payment_date
-
-    for i in range(1, num_installments + 1):
-        installment = Installment(
-            installment_number=i,
-            amount=installment_amount,
-            due_date=current_date,
-            status=PaymentStatus.PENDING
-        )
-        installments.append(installment)
-        current_date += timedelta(days=days_between)
-
-    return InstallmentPlan(
-        merchant_name=merchant_name,
-        total_amount=total_amount,
-        purchase_date=purchase_date,
-        installments=installments
-    )
