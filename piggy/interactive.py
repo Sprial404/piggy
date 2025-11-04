@@ -1,9 +1,12 @@
 from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
 from piggy.utils.input import get_input, get_decimal_input, get_date_input, get_int_input
-from piggy.installment_plan import InstallmentPlan, Installment, PaymentStatus
+from piggy.installment_plan import (
+    InstallmentPlan, Installment, PaymentStatus, build_installment_plan
+)
 from piggy.menu import (
     MenuInterface, NavigationContext, Menu, Command, CommandResult,
     NavigationAction
@@ -66,25 +69,14 @@ def create_installment_plan(_context: NavigationContext) -> CommandResult:
     if not first_payment_date:
         return CommandResult(message="First payment date is required.")
 
-    installments = []
-    current_date = first_payment_date
-
-    for i in range(1, num_installments + 1):
-        installment = Installment(
-            installment_number=i,
-            amount=installment_amount,
-            due_date=current_date,
-            status=PaymentStatus.PENDING
-        )
-        installments.append(installment)
-        current_date += timedelta(days=days_between)
-
     try:
-        plan = InstallmentPlan(
+        plan = build_installment_plan(
             merchant_name=merchant_name,
             total_amount=total_amount,
             purchase_date=purchase_date,
-            installments=installments
+            num_installments=num_installments,
+            days_between=days_between,
+            first_payment_date=first_payment_date
         )
 
         plan_id = f"{merchant_name}_{purchase_date.isoformat()}"
