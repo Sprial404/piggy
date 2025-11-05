@@ -329,16 +329,31 @@ def overview(context: NavigationContext) -> CommandResult:
     return CommandResult(message="Press Enter to continue...")
 
 
-def save_plans(context: NavigationContext) -> CommandResult:
-    print("\n=== Save Plans ===\n")
-    plan_manager = context.get_data("plan_manager")
+def _save_all_plans(plan_manager: PlanManager) -> tuple[int, list[str]]:
+    """
+    Save all plans and print any errors.
 
+    :param plan_manager: PlanManager instance
+    :return: Tuple of (saved_count, errors)
+    """
     if not plan_manager.has_plans():
-        return CommandResult(message="No installment plans to save.")
+        return 0, []
 
     saved_count, errors = plan_manager.save_all()
     for error in errors:
         print(error)
+
+    return saved_count, errors
+
+
+def save_plans(context: NavigationContext) -> CommandResult:
+    print("\n=== Save Plans ===\n")
+    plan_manager = context.get_data("plan_manager")
+
+    saved_count, _ = _save_all_plans(plan_manager)
+
+    if saved_count == 0:
+        return CommandResult(message="No installment plans to save.")
 
     return CommandResult(
         message=f"\nSaved {saved_count} plan(s) to {plan_manager.storage_dir}"
@@ -615,10 +630,8 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
 def save_and_exit(context: NavigationContext) -> CommandResult:
     plan_manager = context.get_data("plan_manager")
 
-    if plan_manager.has_plans():
-        saved_count, errors = plan_manager.save_all()
-        for error in errors:
-            print(error)
+    saved_count, _ = _save_all_plans(plan_manager)
+    if saved_count > 0:
         print(f"\nSaved {saved_count} plan(s) to {plan_manager.storage_dir}")
 
     return CommandResult(action=NavigationAction.EXIT)
