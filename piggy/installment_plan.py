@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
@@ -27,6 +27,8 @@ class Installment(BaseModel):
     due_date: date
     status: PaymentStatus = PaymentStatus.PENDING
     paid_date: date | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
     # noinspection PyNestedDecorators
     @field_validator('paid_date', mode='after')
@@ -56,6 +58,8 @@ class InstallmentPlan(BaseModel):
     total_amount: Decimal = Field(gt=0)
     purchase_date: date
     installments: list[Installment] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
     # noinspection PyNestedDecorators
     @field_validator('installments', mode='after')
@@ -153,6 +157,9 @@ class InstallmentPlan(BaseModel):
             if inst.status == PaymentStatus.PENDING and inst.due_date < as_of:
                 inst.status = PaymentStatus.OVERDUE
                 updated_count += 1
+
+        if updated_count > 0:
+            self.updated_at = datetime.now()
 
         return updated_count
 
@@ -270,6 +277,8 @@ class InstallmentPlan(BaseModel):
             writer.writerow(['Merchant Name', self.merchant_name])
             writer.writerow(['Total Amount', str(self.total_amount)])
             writer.writerow(['Purchase Date', self.purchase_date.isoformat()])
+            writer.writerow(['Created At', self.created_at.isoformat()])
+            writer.writerow(['Updated At', self.updated_at.isoformat()])
             writer.writerow(['Number of Installments', self.num_installments])
             writer.writerow(['Remaining Balance', str(self.remaining_balance)])
             writer.writerow(['Is Fully Paid', self.is_fully_paid])
