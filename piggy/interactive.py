@@ -141,8 +141,6 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
         if inst.paid_date:
             print(f"     Paid on: {inst.paid_date}")
 
-    context.set_data("selected_plan_id", plan_id)
-
     return CommandResult(message="\nPress Enter to continue...")
 
 
