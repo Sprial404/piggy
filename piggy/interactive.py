@@ -7,18 +7,19 @@ from piggy.menu import (
     MenuInterface, NavigationContext, Menu, Command, CommandResult,
     NavigationAction
 )
-from piggy.utils.input import get_input, get_decimal_input, get_date_input, get_int_input
-
-PLANS_STORAGE: dict[str, InstallmentPlan] = {}
-STORAGE_DIR = Path("data")
+from piggy.plan_manager import PlanManager
+from piggy.utils.input import (
+    get_input, get_decimal_input, get_date_input, get_int_input
+)
 
 
 def print_heading(heading: str):
     print(f"\n=== {heading} ===\n")
 
 
-def create_installment_plan(_context: NavigationContext) -> CommandResult:
+def create_installment_plan(context: NavigationContext) -> CommandResult:
     print_heading("Create New Installment Plan")
+    plan_manager = context.get_data("plan_manager")
 
     merchant_name = get_input("Merchant name")
     if not merchant_name:
@@ -62,7 +63,10 @@ def create_installment_plan(_context: NavigationContext) -> CommandResult:
         case _:
             return CommandResult(message="Invalid frequency choice.")
 
-    first_payment_date = get_date_input("First payment date", default=purchase_date + timedelta(days=days_between))
+    first_payment_date = get_date_input(
+        "First payment date",
+        default=purchase_date + timedelta(days=days_between)
+    )
     if not first_payment_date:
         return CommandResult(message="First payment date is required.")
 
@@ -77,7 +81,7 @@ def create_installment_plan(_context: NavigationContext) -> CommandResult:
         )
 
         plan_id = f"{merchant_name}_{purchase_date.isoformat()}"
-        PLANS_STORAGE[plan_id] = plan
+        plan_manager.add_plan(plan_id, plan)
 
         return CommandResult(
             message=f"\nInstallment plan created successfully!\nPlan ID: {plan_id}"
@@ -86,13 +90,14 @@ def create_installment_plan(_context: NavigationContext) -> CommandResult:
         return CommandResult(message=f"Error creating plan: {e}")
 
 
-def list_installment_plans(_context: NavigationContext) -> CommandResult:
+def list_installment_plans(context: NavigationContext) -> CommandResult:
     print_heading("List Installment Plans")
+    plan_manager = context.get_data("plan_manager")
 
-    if not PLANS_STORAGE:
+    if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
 
-    for plan_id, plan in PLANS_STORAGE.items():
+    for plan_id, plan in plan_manager.list_plans().items():
         print(f"\nPlan ID: {plan_id}")
         print(f"  Merchant: {plan.merchant_name}")
         print(f"  Total: ${plan.total_amount}")
@@ -106,12 +111,13 @@ def list_installment_plans(_context: NavigationContext) -> CommandResult:
 
 def view_plan_details(context: NavigationContext) -> CommandResult:
     print("\n=== View Plan Details ===\n")
+    plan_manager = context.get_data("plan_manager")
 
-    if not PLANS_STORAGE:
+    if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
 
     print("Available plans:")
-    plan_ids = list(PLANS_STORAGE.keys())
+    plan_ids = list(plan_manager.list_plans().keys())
     for idx, plan_id in enumerate(plan_ids, 1):
         print(f"{idx}. {plan_id}")
 
@@ -120,7 +126,7 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
         return CommandResult(message="Invalid selection.")
 
     plan_id = plan_ids[choice - 1]
-    plan = PLANS_STORAGE[plan_id]
+    plan = plan_manager.get_plan(plan_id)
 
     print(f"\n=== {plan.merchant_name} ===")
     print(f"Total Amount: ${plan.total_amount}")
@@ -140,16 +146,18 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     return CommandResult(message="\nPress Enter to continue...")
 
 
-def mark_payment(_context: NavigationContext) -> CommandResult:
+def mark_payment(context: NavigationContext) -> CommandResult:
     print("\n=== Mark Payment ===\n")
+    plan_manager = context.get_data("plan_manager")
 
-    if not PLANS_STORAGE:
+    if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
 
     print("Available plans:")
-    plan_ids = list(PLANS_STORAGE.keys())
+    plans_dict = plan_manager.list_plans()
+    plan_ids = list(plans_dict.keys())
     for idx, plan_id in enumerate(plan_ids, 1):
-        plan = PLANS_STORAGE[plan_id]
+        plan = plans_dict[plan_id]
         unpaid_count = len(plan.unpaid_installments)
         paid_count = plan.num_installments - unpaid_count
         print(f"{idx}. {plan_id} ({paid_count} paid, {unpaid_count} unpaid)")
@@ -159,7 +167,7 @@ def mark_payment(_context: NavigationContext) -> CommandResult:
         return CommandResult(message="Invalid selection.")
 
     plan_id = plan_ids[choice - 1]
-    plan = PLANS_STORAGE[plan_id]
+    plan = plan_manager.get_plan(plan_id)
 
     print("\nAll installments:")
     for inst in plan.installments:
@@ -240,25 +248,27 @@ def mark_payment(_context: NavigationContext) -> CommandResult:
             return CommandResult(message=f"\n{marked_count} installments marked as unpaid!")
 
 
-def overview(_context: NavigationContext) -> CommandResult:
+def overview(context: NavigationContext) -> CommandResult:
     print("\n=== Overview ===\n")
+    plan_manager = context.get_data("plan_manager")
 
-    if not PLANS_STORAGE:
+    if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
 
     today = date.today()
     upcoming_days = 30
+    plans_dict = plan_manager.list_plans()
 
-    total_plans = len(PLANS_STORAGE)
-    total_remaining = sum(plan.remaining_balance for plan in PLANS_STORAGE.values())
+    total_plans = len(plans_dict)
+    total_remaining = sum(plan.remaining_balance for plan in plans_dict.values())
     total_paid = sum(
         sum(inst.amount for inst in plan.installments if inst.status == PaymentStatus.PAID)
-        for plan in PLANS_STORAGE.values()
+        for plan in plans_dict.values()
     )
-    fully_paid_count = sum(1 for plan in PLANS_STORAGE.values() if plan.is_fully_paid)
+    fully_paid_count = sum(1 for plan in plans_dict.values() if plan.is_fully_paid)
 
     all_unpaid = []
-    for plan_id, plan in PLANS_STORAGE.items():
+    for plan_id, plan in plans_dict.items():
         for inst in plan.unpaid_installments:
             all_unpaid.append({
                 'plan_id': plan_id,
@@ -343,57 +353,48 @@ def overview(_context: NavigationContext) -> CommandResult:
     return CommandResult(message="Press Enter to continue...")
 
 
-def save_plans(_context: NavigationContext) -> CommandResult:
+def save_plans(context: NavigationContext) -> CommandResult:
     print("\n=== Save Plans ===\n")
+    plan_manager = context.get_data("plan_manager")
 
-    if not PLANS_STORAGE:
+    if not plan_manager.has_plans():
         return CommandResult(message="No installment plans to save.")
 
-    STORAGE_DIR.mkdir(exist_ok=True)
+    saved_count, errors = plan_manager.save_all()
+    for error in errors:
+        print(error)
 
-    saved_count = 0
-    for plan_id, plan in PLANS_STORAGE.items():
-        try:
-            file_path = STORAGE_DIR / f"{plan_id}.json"
-            plan.to_json(str(file_path))
-            saved_count += 1
-        except Exception as e:
-            print(f"Error saving {plan_id}: {e}")
-
-    return CommandResult(message=f"\nSaved {saved_count} plan(s) to {STORAGE_DIR}")
+    return CommandResult(
+        message=f"\nSaved {saved_count} plan(s) to {plan_manager.storage_dir}"
+    )
 
 
-def load_plans(_context: NavigationContext) -> CommandResult:
+def load_plans(context: NavigationContext) -> CommandResult:
     print("\n=== Load Plans ===\n")
+    plan_manager = context.get_data("plan_manager")
 
-    if not STORAGE_DIR.exists():
+    loaded_count, errors = plan_manager.load_all()
+
+    if loaded_count == 0 and not errors:
         return CommandResult(message="No saved plans found.")
 
-    json_files = list(STORAGE_DIR.glob("*.json"))
-    if not json_files:
-        return CommandResult(message="No saved plans found.")
+    for error in errors:
+        print(error)
 
-    loaded_count = 0
-    for file_path in json_files:
-        try:
-            plan = InstallmentPlan.from_json_file(str(file_path))
-            plan_id = file_path.stem
-            PLANS_STORAGE[plan_id] = plan
-            loaded_count += 1
-        except Exception as e:
-            print(f"Error loading {file_path.name}: {e}")
-
-    return CommandResult(message=f"\nLoaded {loaded_count} plan(s) from {STORAGE_DIR}")
+    return CommandResult(
+        message=f"\nLoaded {loaded_count} plan(s) from {plan_manager.storage_dir}"
+    )
 
 
-def export_plan_csv(_context: NavigationContext) -> CommandResult:
+def export_plan_csv(context: NavigationContext) -> CommandResult:
     print("\n=== Export Plan to CSV ===\n")
+    plan_manager = context.get_data("plan_manager")
 
-    if not PLANS_STORAGE:
+    if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
 
     print("Available plans:")
-    plan_ids = list(PLANS_STORAGE.keys())
+    plan_ids = list(plan_manager.list_plans().keys())
     for idx, plan_id in enumerate(plan_ids, 1):
         print(f"{idx}. {plan_id}")
 
@@ -402,11 +403,11 @@ def export_plan_csv(_context: NavigationContext) -> CommandResult:
         return CommandResult(message="Invalid selection.")
 
     plan_id = plan_ids[choice - 1]
-    plan = PLANS_STORAGE[plan_id]
+    plan = plan_manager.get_plan(plan_id)
 
-    STORAGE_DIR.mkdir(exist_ok=True)
+    plan_manager.storage_dir.mkdir(exist_ok=True)
 
-    csv_path = STORAGE_DIR / f"{plan_id}.csv"
+    csv_path = plan_manager.storage_dir / f"{plan_id}.csv"
     try:
         plan.to_csv(str(csv_path))
         return CommandResult(message=f"\nPlan exported to {csv_path}")
@@ -414,15 +415,21 @@ def export_plan_csv(_context: NavigationContext) -> CommandResult:
         return CommandResult(message=f"Error exporting plan: {e}")
 
 
-def select_plan(_context: NavigationContext, prompt: str = "Select plan number") -> Optional[tuple[str, InstallmentPlan]]:
-    if not PLANS_STORAGE:
+def select_plan(
+    context: NavigationContext,
+    prompt: str = "Select plan number"
+) -> Optional[tuple[str, InstallmentPlan]]:
+    plan_manager = context.get_data("plan_manager")
+
+    if not plan_manager.has_plans():
         print("No installment plans found.")
         return None
 
     print("Available plans:")
-    plan_ids = list(PLANS_STORAGE.keys())
+    plans_dict = plan_manager.list_plans()
+    plan_ids = list(plans_dict.keys())
     for idx, plan_id in enumerate(plan_ids, 1):
-        plan = PLANS_STORAGE[plan_id]
+        plan = plans_dict[plan_id]
         print(f"{idx}. {plan_id} - ${plan.total_amount} ({plan.merchant_name})")
 
     choice = get_int_input(f"\n{prompt}", min_val=1, max_val=len(plan_ids))
@@ -430,17 +437,18 @@ def select_plan(_context: NavigationContext, prompt: str = "Select plan number")
         return None
 
     plan_id = plan_ids[choice - 1]
-    return plan_id, PLANS_STORAGE[plan_id]
+    return plan_id, plan_manager.get_plan(plan_id)
 
 
 def edit_merchant_name(context: NavigationContext) -> CommandResult:
     print("\n=== Edit Merchant Name ===\n")
+    plan_manager = context.get_data("plan_manager")
 
     plan_id = context.get_data("edit_plan_id")
-    if not plan_id or plan_id not in PLANS_STORAGE:
-        return CommandResult(message="No plan selected.")
+    plan = plan_manager.get_plan(plan_id) if plan_id else None
 
-    plan = PLANS_STORAGE[plan_id]
+    if not plan:
+        return CommandResult(message="No plan selected.")
 
     print(f"\nCurrent merchant name: {plan.merchant_name}")
     new_name = get_input("New merchant name")
@@ -452,7 +460,8 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
 
     new_plan_id = f"{new_name}_{plan.purchase_date.isoformat()}"
     if new_plan_id != plan_id:
-        PLANS_STORAGE[new_plan_id] = PLANS_STORAGE.pop(plan_id)
+        plan_manager.remove_plan(plan_id)
+        plan_manager.add_plan(new_plan_id, plan)
         context.set_data("edit_plan_id", new_plan_id)
 
     return CommandResult(message=f"\nMerchant name updated to: {new_name}")
@@ -460,12 +469,13 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
 
 def edit_installment_amount(context: NavigationContext) -> CommandResult:
     print("\n=== Edit Installment Amount ===\n")
+    plan_manager = context.get_data("plan_manager")
 
     plan_id = context.get_data("edit_plan_id")
-    if not plan_id or plan_id not in PLANS_STORAGE:
-        return CommandResult(message="No plan selected.")
+    plan = plan_manager.get_plan(plan_id) if plan_id else None
 
-    plan = PLANS_STORAGE[plan_id]
+    if not plan:
+        return CommandResult(message="No plan selected.")
 
     print("\nInstallments:")
     for inst in plan.installments:
@@ -505,12 +515,13 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
 def edit_installment_due_date(context: NavigationContext) -> CommandResult:
     """Edit the due date of a specific installment"""
     print("\n=== Edit Installment Due Date ===\n")
+    plan_manager = context.get_data("plan_manager")
 
     plan_id = context.get_data("edit_plan_id")
-    if not plan_id or plan_id not in PLANS_STORAGE:
-        return CommandResult(message="No plan selected.")
+    plan = plan_manager.get_plan(plan_id) if plan_id else None
 
-    plan = PLANS_STORAGE[plan_id]
+    if not plan:
+        return CommandResult(message="No plan selected.")
 
     print("\nInstallments:")
     for inst in plan.installments:
@@ -536,12 +547,13 @@ def edit_installment_due_date(context: NavigationContext) -> CommandResult:
 
 def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
     print("\n=== Edit Installment Paid Date ===\n")
+    plan_manager = context.get_data("plan_manager")
 
     plan_id = context.get_data("edit_plan_id")
-    if not plan_id or plan_id not in PLANS_STORAGE:
-        return CommandResult(message="No plan selected.")
+    plan = plan_manager.get_plan(plan_id) if plan_id else None
 
-    plan = PLANS_STORAGE[plan_id]
+    if not plan:
+        return CommandResult(message="No plan selected.")
 
     paid_installments = [inst for inst in plan.installments if inst.status == PaymentStatus.PAID]
 
@@ -574,24 +586,27 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
 
 def delete_plan(context: NavigationContext) -> CommandResult:
     print("\n=== Delete Plan ===\n")
+    plan_manager = context.get_data("plan_manager")
 
     plan_id = context.get_data("edit_plan_id")
-    if not plan_id or plan_id not in PLANS_STORAGE:
-        return CommandResult(message="No plan selected.")
+    plan = plan_manager.get_plan(plan_id) if plan_id else None
 
-    plan = PLANS_STORAGE[plan_id]
+    if not plan:
+        return CommandResult(message="No plan selected.")
 
     print(f"\nPlan: {plan.merchant_name}")
     print(f"Total: ${plan.total_amount}")
     print(f"Remaining: ${plan.remaining_balance}")
 
-    confirm = get_input("\nAre you sure you want to delete this plan? (yes/no)", default="no")
+    confirm = get_input(
+        "\nAre you sure you want to delete this plan? (yes/no)",
+        default="no"
+    )
 
     if confirm.lower() != 'yes':
         return CommandResult(message="Deletion cancelled.")
 
-    del PLANS_STORAGE[plan_id]
-
+    plan_manager.remove_plan(plan_id)
     context.clear_data("edit_plan_id")
 
     return CommandResult(
@@ -630,19 +645,14 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
     )
 
 
-def save_and_exit(_context: NavigationContext) -> CommandResult:
-    if PLANS_STORAGE:
-        STORAGE_DIR.mkdir(exist_ok=True)
-        saved_count = 0
-        for plan_id, plan in PLANS_STORAGE.items():
-            try:
-                file_path = STORAGE_DIR / f"{plan_id}.json"
-                plan.to_json(str(file_path))
-                saved_count += 1
-            except Exception as e:
-                print(f"Error saving {plan_id}: {e}")
+def save_and_exit(context: NavigationContext) -> CommandResult:
+    plan_manager = context.get_data("plan_manager")
 
-        print(f"\nSaved {saved_count} plan(s) to {STORAGE_DIR}")
+    if plan_manager.has_plans():
+        saved_count, errors = plan_manager.save_all()
+        for error in errors:
+            print(error)
+        print(f"\nSaved {saved_count} plan(s) to {plan_manager.storage_dir}")
 
     return CommandResult(action=NavigationAction.EXIT)
 
@@ -652,6 +662,10 @@ def exit_without_saving(_context: NavigationContext) -> CommandResult:
 
 
 def main():
+    plan_manager = PlanManager()
+    context = NavigationContext()
+    context.set_data("plan_manager", plan_manager)
+
     main_menu = Menu("Installment Plan Tracker")
     main_menu.add_command("o", Command("Overview", overview))
     main_menu.add_command("1", Command("Create New Plan", create_installment_plan))
@@ -670,12 +684,15 @@ def main():
     main_menu.add_command("e", Command("Save and Exit", save_and_exit))
     main_menu.add_command("q", Command("Exit without Saving", exit_without_saving))
 
-    if STORAGE_DIR.exists() and any(STORAGE_DIR.glob("*.json")):
-        print("Loading saved plans...")
-        load_plans(NavigationContext())
+    loaded_count, errors = plan_manager.load_all()
+    if loaded_count > 0:
+        print(f"Loaded {loaded_count} saved plan(s)")
+    for error in errors:
+        print(error)
+    if loaded_count > 0 or errors:
         print()
 
-    MenuInterface(main_menu).run()
+    MenuInterface(main_menu, context).run()
 
     print("\nThank you for using Installment Plan Tracker!")
 

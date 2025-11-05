@@ -182,8 +182,12 @@ class Menu:
 
 
 class MenuInterface:
-    def __init__(self, start_menu: Menu):
-        self._context = NavigationContext()
+    def __init__(
+        self,
+        start_menu: Menu,
+        context: Optional[NavigationContext] = None
+    ):
+        self._context = context if context is not None else NavigationContext()
         self._context.push_menu(start_menu)
 
     def run(self) -> Any:
