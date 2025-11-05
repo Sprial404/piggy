@@ -9,10 +9,16 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class PaymentStatus(StrEnum):
+    """
+    Status of an installment payment.
+
+    PENDING: Payment not yet due or awaiting payment
+    PAID: Payment successfully completed
+    OVERDUE: Payment past due date but not yet paid
+    """
     PENDING = "pending"
     PAID = "paid"
     OVERDUE = "overdue"
-    FAILED = "failed"
 
 
 class Installment(BaseModel):
