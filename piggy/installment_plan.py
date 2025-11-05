@@ -36,6 +36,20 @@ class Installment(BaseModel):
             raise ValueError("paid_date can only be set when status is PAID")
         return value
 
+    @property
+    def is_paid(self) -> bool:
+        """Check if this installment has been paid."""
+        return self.status == PaymentStatus.PAID
+
+    @property
+    def is_pending(self) -> bool:
+        """Check if this installment is pending payment."""
+        return self.status == PaymentStatus.PENDING
+
+    @property
+    def is_overdue(self) -> bool:
+        """Check if this installment is overdue."""
+        return self.status == PaymentStatus.OVERDUE
 
 class InstallmentPlan(BaseModel):
     merchant_name: str
@@ -162,6 +176,18 @@ class InstallmentPlan(BaseModel):
             result.append(lookup[num])
 
         return result
+
+    def get_installment(self, number: int) -> Installment:
+        """
+        Get a single installment by installment number.
+
+        :param number: Installment number (not list index) to retrieve
+        :return: Installment object
+        :raises ValueError: If installment number does not exist
+        """
+        if number < 1 or number > len(self.installments):
+            raise ValueError(f"Installment #{number} does not exist.")
+        return self.installments[number - 1]
 
     @staticmethod
     def build(
