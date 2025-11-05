@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 
 class NavigationAction(Enum):
@@ -17,12 +17,12 @@ class NavigationContext:
     def __init__(self):
         self._menu_stack: list['Menu'] = []
         self._shared_data: dict[str, Any] = {}
-        self._last_result: 'CommandResult' | None = None
+        self._last_result: Optional['CommandResult'] = None
 
     def push_menu(self, menu: 'Menu'):
         self._menu_stack.append(menu)
 
-    def pop_menu(self) -> 'Menu' | None:
+    def pop_menu(self) -> Optional['Menu']:
         if len(self._menu_stack) > 1:
             self._menu_stack.pop()
             return self.get_current_menu()
@@ -38,7 +38,7 @@ class NavigationContext:
         else:
             self._menu_stack.append(menu)
 
-    def get_current_menu(self) -> 'Menu' | None:
+    def get_current_menu(self) -> Optional['Menu']:
         return self._menu_stack[-1] if self._menu_stack else None
 
     def get_breadcrumb(self) -> str:
@@ -77,7 +77,7 @@ class NavigationContext:
 @dataclass
 class CommandResult:
     action: NavigationAction = NavigationAction.NONE
-    target_menu: 'Menu' | None = None
+    target_menu: Optional['Menu'] = None
     message: str | None = None
     return_value: Any | None = None
 
