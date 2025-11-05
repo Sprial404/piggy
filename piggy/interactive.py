@@ -47,6 +47,17 @@ class PaymentStatistics:
     next_30_days_total: float
 
 
+def generate_plan_id(merchant_name: str, purchase_date: date) -> str:
+    """
+    Generate a unique plan ID from merchant name and purchase date.
+
+    :param merchant_name: Name of the merchant
+    :param purchase_date: Date of purchase
+    :return: Plan ID in format: merchant_YYYY-MM-DD
+    """
+    return f"{merchant_name}_{purchase_date.isoformat()}"
+
+
 def print_heading(heading: str):
     print(f"\n=== {heading} ===\n")
 
@@ -114,7 +125,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
             first_payment_date=first_payment_date
         )
 
-        plan_id = f"{merchant_name}_{purchase_date.isoformat()}"
+        plan_id = generate_plan_id(merchant_name, purchase_date)
         plan_manager.add_plan(plan_id, plan)
 
         return CommandResult(
@@ -606,7 +617,7 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
 
     plan.merchant_name = new_name
 
-    new_plan_id = f"{new_name}_{plan.purchase_date.isoformat()}"
+    new_plan_id = generate_plan_id(new_name, plan.purchase_date)
     if new_plan_id != plan_id:
         plan_manager.remove_plan(plan_id)
         plan_manager.add_plan(new_plan_id, plan)
