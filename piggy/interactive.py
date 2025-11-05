@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from enum import IntEnum
 from typing import Any, Callable, TypedDict
 
 from piggy.installment_plan import InstallmentPlan, PaymentStatus, Installment
@@ -12,6 +13,19 @@ from piggy.utils import get_project_root
 from piggy.utils.input import (
     get_input, get_decimal_input, get_date_input, get_int_input
 )
+
+
+class PaymentFrequency(IntEnum):
+    """Common payment frequencies in days."""
+    MONTHLY = 30
+    FORTNIGHTLY = 14
+    WEEKLY = 7
+
+
+class ContextKeys:
+    """Constants for NavigationContext data keys."""
+    PLAN_MANAGER = "plan_manager"
+    EDIT_PLAN_ID = "edit_plan_id"
 
 
 @dataclass
@@ -79,7 +93,7 @@ def print_heading(heading: str):
 
 def create_installment_plan(context: NavigationContext) -> CommandResult:
     print_heading("Create New Installment Plan")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     merchant_name = get_input("Merchant name")
     if not merchant_name:
@@ -111,11 +125,11 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
 
     match frequency_choice:
         case "1":
-            days_between = 30
+            days_between = PaymentFrequency.MONTHLY
         case "2":
-            days_between = 14
+            days_between = PaymentFrequency.FORTNIGHTLY
         case "3":
-            days_between = 7
+            days_between = PaymentFrequency.WEEKLY
         case "4":
             days_between = get_int_input("Days between payments", min_val=1)
             if not days_between:
@@ -152,7 +166,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
 
 def list_installment_plans(context: NavigationContext) -> CommandResult:
     print_heading("List Installment Plans")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
@@ -502,7 +516,7 @@ def _display_payment_overview(
 
 def overview(context: NavigationContext) -> CommandResult:
     print("\n=== Overview ===\n")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     if not plan_manager.has_plans():
         return CommandResult(message="No installment plans found.")
@@ -540,7 +554,7 @@ def _save_all_plans(plan_manager: PlanManager) -> tuple[int, list[str]]:
 
 def save_plans(context: NavigationContext) -> CommandResult:
     print("\n=== Save Plans ===\n")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     saved_count, _ = _save_all_plans(plan_manager)
 
@@ -554,7 +568,7 @@ def save_plans(context: NavigationContext) -> CommandResult:
 
 def load_plans(context: NavigationContext) -> CommandResult:
     print("\n=== Load Plans ===\n")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     loaded_count, errors = plan_manager.load_all()
 
@@ -577,7 +591,7 @@ def export_plan_csv(context: NavigationContext) -> CommandResult:
         return CommandResult(message="No plan selected.")
 
     plan_id, plan = result
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     plan_manager.storage_dir.mkdir(exist_ok=True)
 
@@ -593,7 +607,7 @@ def select_plan(
     context: NavigationContext,
     prompt: str = "Select plan number"
 ) -> tuple[str, InstallmentPlan] | None:
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     if not plan_manager.has_plans():
         print("No installment plans found.")
@@ -616,9 +630,9 @@ def select_plan(
 
 def edit_merchant_name(context: NavigationContext) -> CommandResult:
     print("\n=== Edit Merchant Name ===\n")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
-    plan_id = context.get_data("edit_plan_id")
+    plan_id = context.get_data(ContextKeys.EDIT_PLAN_ID)
     plan = plan_manager.get_plan(plan_id) if plan_id else None
 
     if not plan:
@@ -636,7 +650,7 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
     if new_plan_id != plan_id:
         plan_manager.remove_plan(plan_id)
         plan_manager.add_plan(new_plan_id, plan)
-        context.set_data("edit_plan_id", new_plan_id)
+        context.set_data(ContextKeys.EDIT_PLAN_ID, new_plan_id)
 
     return CommandResult(message=f"\nMerchant name updated to: {new_name}")
 
@@ -667,9 +681,9 @@ def _edit_installment_field(
     :return: CommandResult
     """
     print(f"\n=== {heading} ===\n")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
-    plan_id = context.get_data("edit_plan_id")
+    plan_id = context.get_data(ContextKeys.EDIT_PLAN_ID)
     plan = plan_manager.get_plan(plan_id) if plan_id else None
 
     if not plan:
@@ -785,9 +799,9 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
 
 def delete_plan(context: NavigationContext) -> CommandResult:
     print("\n=== Delete Plan ===\n")
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
-    plan_id = context.get_data("edit_plan_id")
+    plan_id = context.get_data(ContextKeys.EDIT_PLAN_ID)
     plan = plan_manager.get_plan(plan_id) if plan_id else None
 
     if not plan:
@@ -823,7 +837,7 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
 
     plan_id, plan = result
 
-    context.set_data("edit_plan_id", plan_id)
+    context.set_data(ContextKeys.EDIT_PLAN_ID, plan_id)
 
     print(f"\nEditing plan: {plan.merchant_name}")
     print(f"Total: ${plan.total_amount}")
@@ -845,7 +859,7 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
 
 
 def save_and_exit(context: NavigationContext) -> CommandResult:
-    plan_manager = context.get_data("plan_manager")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     saved_count, _ = _save_all_plans(plan_manager)
     if saved_count > 0:
@@ -865,7 +879,7 @@ def main():
     plan_manager = PlanManager(storage_dir)
 
     context = NavigationContext()
-    context.set_data("plan_manager", plan_manager)
+    context.set_data(ContextKeys.PLAN_MANAGER, plan_manager)
 
     main_menu = Menu("Installment Plan Tracker")
     main_menu.add_command("o", Command("Overview", overview))
