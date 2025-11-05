@@ -160,12 +160,38 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     print(f"\nInstallments:")
 
     for inst in plan.installments:
-        status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
-        print(f"  {status_symbol} #{inst.installment_number}: ${inst.amount} due {inst.due_date} [{inst.status.value}]")
+        print(format_installment_line(inst, show_status=True))
         if inst.paid_date:
             print(f"     Paid on: {inst.paid_date}")
 
     return CommandResult(message="\nPress Enter to continue...")
+
+
+def format_installment_line(
+    inst: Installment,
+    show_status: bool = False,
+    show_paid_date_inline: bool = False,
+    indent: str = "  "
+) -> str:
+    """
+    Format an installment as a display line.
+
+    :param inst: Installment to format
+    :param show_status: Include status value in brackets
+    :param show_paid_date_inline: Include paid date inline (vs separate line)
+    :param indent: Indentation string
+    :return: Formatted installment line
+    """
+    status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
+    line = f"{indent}{status_symbol} #{inst.installment_number}: ${inst.amount} due {inst.due_date}"
+
+    if show_status:
+        line += f" [{inst.status.value}]"
+
+    if show_paid_date_inline and inst.status == PaymentStatus.PAID and inst.paid_date:
+        line += f" [PAID on {inst.paid_date}]"
+
+    return line
 
 
 def _display_installments(plan: InstallmentPlan) -> None:
@@ -582,8 +608,7 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
 
     print("\nInstallments:")
     for inst in plan.installments:
-        status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
-        print(f"  {status_symbol} #{inst.installment_number}: ${inst.amount} due {inst.due_date}")
+        print(format_installment_line(inst))
 
     inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
     if not inst_num:
@@ -628,8 +653,7 @@ def edit_installment_due_date(context: NavigationContext) -> CommandResult:
 
     print("\nInstallments:")
     for inst in plan.installments:
-        status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
-        print(f"  {status_symbol} #{inst.installment_number}: ${inst.amount} due {inst.due_date}")
+        print(format_installment_line(inst))
 
     inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
     if not inst_num:
