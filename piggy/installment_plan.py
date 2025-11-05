@@ -99,6 +99,44 @@ class InstallmentPlan(BaseModel):
             return None
         return min(inst.due_date for inst in unpaid)
 
+    def get_overdue_installments(self, as_of: Optional[date] = None) -> list[Installment]:
+        """
+        Get installments that are overdue.
+
+        :param as_of: Date to check against (defaults to today)
+        :return: List of overdue installments
+        """
+        if as_of is None:
+            as_of = date.today()
+
+        return [
+            inst for inst in self.installments
+            if inst.status != PaymentStatus.PAID and inst.due_date < as_of
+        ]
+
+    @property
+    def has_overdue_payments(self) -> bool:
+        """Check if any installments are overdue based on today's date"""
+        return len(self.get_overdue_installments()) > 0
+
+    def update_overdue_status(self, as_of: Optional[date] = None) -> int:
+        """
+        Update status to OVERDUE for unpaid installments past their due date.
+
+        :param as_of: Date to check against (defaults to today)
+        :return: Number of installments updated to OVERDUE status
+        """
+        if as_of is None:
+            as_of = date.today()
+
+        updated_count = 0
+        for inst in self.installments:
+            if inst.status == PaymentStatus.PENDING and inst.due_date < as_of:
+                inst.status = PaymentStatus.OVERDUE
+                updated_count += 1
+
+        return updated_count
+
     def get_installments(self, numbers: list[int] | None = None) -> list[Installment]:
         """
         Get installments by installment number.

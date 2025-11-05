@@ -440,6 +440,9 @@ def overview(context: NavigationContext) -> CommandResult:
     upcoming_days = 30
     plans_dict = plan_manager.list_plans()
 
+    for plan in plans_dict.values():
+        plan.update_overdue_status(today)
+
     categorized = _categorize_unpaid_installments(plans_dict, today, upcoming_days)
     stats = _calculate_payment_statistics(plans_dict, categorized)
     _display_payment_overview(stats, categorized, upcoming_days)
@@ -793,6 +796,11 @@ def main():
         print(error)
     if loaded_count > 0 or errors:
         print()
+
+    if loaded_count > 0:
+        today = date.today()
+        for plan in plan_manager.list_plans().values():
+            plan.update_overdue_status(today)
 
     MenuInterface(main_menu, context).run()
 
