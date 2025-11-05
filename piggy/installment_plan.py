@@ -53,6 +53,41 @@ class Installment(BaseModel):
         """Check if this installment is overdue."""
         return self.status == PaymentStatus.OVERDUE
 
+    def set_amount(self, new_amount: Decimal) -> None:
+        """Set installment amount."""
+        if new_amount <= 0:
+            raise ValueError("Amount must be greater than zero.")
+        self.amount = new_amount
+        self.updated_at = datetime.now()
+
+    def set_due_date(self, new_due_date: date) -> None:
+        """Set due date."""
+        self.due_date = new_due_date
+        self.updated_at = datetime.now()
+
+    def set_status(self, new_status: PaymentStatus) -> None:
+        """Set payment status."""
+        self.status = new_status
+        self.updated_at = datetime.now()
+
+    def set_paid_date(self, new_paid_date: date | None) -> None:
+        """Set paid date."""
+        self.paid_date = new_paid_date
+        self.updated_at = datetime.now()
+
+    def mark_paid(self, paid_date: date) -> None:
+        """Mark as paid with date."""
+        self.status = PaymentStatus.PAID
+        self.paid_date = paid_date
+        self.updated_at = datetime.now()
+
+    def mark_unpaid(self) -> None:
+        """Mark as pending (unpaid) and clear paid date."""
+        self.status = PaymentStatus.PENDING
+        self.paid_date = None
+        self.updated_at = datetime.now()
+
+
 class InstallmentPlan(BaseModel):
     merchant_name: str
     total_amount: Decimal = Field(gt=0)
@@ -195,6 +230,74 @@ class InstallmentPlan(BaseModel):
         if number < 1 or number > len(self.installments):
             raise ValueError(f"Installment #{number} does not exist.")
         return self.installments[number - 1]
+
+    def set_merchant_name(self, new_name: str) -> None:
+        """Set merchant name."""
+        self.merchant_name = new_name
+        self.updated_at = datetime.now()
+
+    def set_installment_amount(self, number: int, new_amount: Decimal) -> None:
+        """
+        Set installment amount and recalculate plan total.
+
+        :param number: Installment number to update
+        :param new_amount: New installment amount
+        :raises ValueError: If installment number does not exist or amount is invalid
+        """
+        installment = self.get_installment(number)
+        old_amount = installment.amount
+        installment.set_amount(new_amount)
+        self.total_amount = self.total_amount - old_amount + new_amount
+        self.updated_at = datetime.now()
+
+    def set_installment_due_date(self, number: int, new_due_date: date) -> None:
+        """
+        Set installment due date.
+
+        :param number: Installment number to update
+        :param new_due_date: New due date
+        :raises ValueError: If installment number does not exist
+        """
+        installment = self.get_installment(number)
+        installment.set_due_date(new_due_date)
+        self.updated_at = datetime.now()
+
+    def set_installment_paid_date(self, number: int, new_paid_date: date) -> None:
+        """
+        Set installment paid date.
+
+        :param number: Installment number to update
+        :param new_paid_date: New paid date
+        :raises ValueError: If installment number does not exist or installment is not paid
+        """
+        installment = self.get_installment(number)
+        if not installment.is_paid:
+            raise ValueError(f"Installment #{number} is not marked as paid.")
+        installment.set_paid_date(new_paid_date)
+        self.updated_at = datetime.now()
+
+    def mark_installment_paid(self, number: int, paid_date: date) -> None:
+        """
+        Mark installment as paid.
+
+        :param number: Installment number to mark as paid
+        :param paid_date: Date the payment was made
+        :raises ValueError: If installment number does not exist
+        """
+        installment = self.get_installment(number)
+        installment.mark_paid(paid_date)
+        self.updated_at = datetime.now()
+
+    def mark_installment_unpaid(self, number: int) -> None:
+        """
+        Mark installment as unpaid.
+
+        :param number: Installment number to mark as unpaid
+        :raises ValueError: If installment number does not exist
+        """
+        installment = self.get_installment(number)
+        installment.mark_unpaid()
+        self.updated_at = datetime.now()
 
     @staticmethod
     def build(
