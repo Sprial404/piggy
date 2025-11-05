@@ -1,8 +1,8 @@
+from dataclasses import dataclass
 from datetime import date, timedelta
-from pathlib import Path
 from typing import Optional
 
-from piggy.installment_plan import InstallmentPlan, PaymentStatus
+from piggy.installment_plan import InstallmentPlan, PaymentStatus, Installment
 from piggy.menu import (
     MenuInterface, NavigationContext, Menu, Command, CommandResult,
     NavigationAction
@@ -12,6 +12,39 @@ from piggy.utils import get_project_root
 from piggy.utils.input import (
     get_input, get_decimal_input, get_date_input, get_int_input
 )
+
+
+@dataclass
+class PaymentInfo:
+    """Information about a payment installment for display purposes."""
+    plan_id: str
+    merchant: str
+    installment: Installment
+    days_until_due: int
+
+
+@dataclass
+class CategorizedPayments:
+    """Categorized payment installments by due date."""
+    all_unpaid: list[PaymentInfo]
+    overdue: list[PaymentInfo]
+    due_today: list[PaymentInfo]
+    upcoming: list[PaymentInfo]
+    future: list[PaymentInfo]
+
+
+@dataclass
+class PaymentStatistics:
+    """Summary statistics for payment overview."""
+    total_plans: int
+    fully_paid_count: int
+    total_paid: float
+    total_remaining: float
+    total_unpaid_installments: int
+    overdue_total: float
+    due_today_total: float
+    upcoming_total: float
+    next_30_days_total: float
 
 
 def print_heading(heading: str):
@@ -224,6 +257,157 @@ def mark_payment(context: NavigationContext) -> CommandResult:
             return CommandResult(message=f"\n{marked_count} installments marked as unpaid!")
 
 
+def _calculate_payment_statistics(
+    plans_dict: dict[str, InstallmentPlan],
+    categorized: CategorizedPayments
+) -> PaymentStatistics:
+    """
+    Calculate summary statistics for payment overview.
+
+    :param plans_dict: Dictionary of plan_id -> InstallmentPlan
+    :param categorized: Categorized payments
+    :return: PaymentStatistics with calculated values
+    """
+    total_plans = len(plans_dict)
+    total_remaining = sum(plan.remaining_balance for plan in plans_dict.values())
+    total_paid = sum(
+        sum(inst.amount for inst in plan.installments if inst.status == PaymentStatus.PAID)
+        for plan in plans_dict.values()
+    )
+    fully_paid_count = sum(1 for plan in plans_dict.values() if plan.is_fully_paid)
+
+    overdue_total = sum(p.installment.amount for p in categorized.overdue)
+    due_today_total = sum(p.installment.amount for p in categorized.due_today)
+    upcoming_total = sum(p.installment.amount for p in categorized.upcoming)
+    next_30_days_total = overdue_total + due_today_total + upcoming_total
+
+    return PaymentStatistics(
+        total_plans=total_plans,
+        fully_paid_count=fully_paid_count,
+        total_paid=total_paid,
+        total_remaining=total_remaining,
+        total_unpaid_installments=len(categorized.all_unpaid),
+        overdue_total=overdue_total,
+        due_today_total=due_today_total,
+        upcoming_total=upcoming_total,
+        next_30_days_total=next_30_days_total
+    )
+
+
+def _categorize_unpaid_installments(
+    plans_dict: dict[str, InstallmentPlan],
+    today: date,
+    upcoming_days: int
+) -> CategorizedPayments:
+    """
+    Categorize unpaid installments by due date.
+
+    :param plans_dict: Dictionary of plan_id -> InstallmentPlan
+    :param today: Current date
+    :param upcoming_days: Number of days to consider as upcoming
+    :return: CategorizedPayments with installments sorted by category
+    """
+    all_unpaid = []
+    for plan_id, plan in plans_dict.items():
+        for inst in plan.unpaid_installments:
+            all_unpaid.append(PaymentInfo(
+                plan_id=plan_id,
+                merchant=plan.merchant_name,
+                installment=inst,
+                days_until_due=(inst.due_date - today).days
+            ))
+
+    all_unpaid.sort(key=lambda x: x.installment.due_date)
+
+    overdue = [p for p in all_unpaid if p.days_until_due < 0]
+    due_today = [p for p in all_unpaid if p.days_until_due == 0]
+    upcoming = [p for p in all_unpaid if 0 < p.days_until_due <= upcoming_days]
+    future = [p for p in all_unpaid if p.days_until_due > upcoming_days]
+
+    return CategorizedPayments(
+        all_unpaid=all_unpaid,
+        overdue=overdue,
+        due_today=due_today,
+        upcoming=upcoming,
+        future=future
+    )
+
+
+def _display_payment_overview(
+    stats: PaymentStatistics,
+    categorized: CategorizedPayments,
+    upcoming_days: int
+) -> None:
+    """
+    Display payment overview information.
+
+    :param stats: Payment statistics
+    :param categorized: Categorized payments
+    :param upcoming_days: Number of days considered as upcoming
+    """
+    print("Summary Statistics")
+    print("-" * 50)
+    active_count = stats.total_plans - stats.fully_paid_count
+    print(f"Total Plans: {stats.total_plans} ({stats.fully_paid_count} fully paid, {active_count} active)")
+    print(f"Total Paid: ${stats.total_paid:.2f}")
+    print(f"Total Remaining: ${stats.total_remaining:.2f}")
+    print(f"Total Unpaid Installments: {stats.total_unpaid_installments}")
+    print(f"Total Due in Next {upcoming_days} Days: ${stats.next_30_days_total:.2f}")
+    print()
+
+    if categorized.overdue:
+        print(f"⚠️  OVERDUE PAYMENTS ({len(categorized.overdue)})")
+        print("-" * 50)
+        for p in categorized.overdue:
+            inst = p.installment
+            days_overdue = abs(p.days_until_due)
+            print(f"  {p.merchant} - Installment #{inst.installment_number}")
+            print(f"    ${inst.amount:.2f} - Due: {inst.due_date} ({days_overdue} days overdue)")
+        print()
+
+    if categorized.due_today:
+        print(f"🔔 DUE TODAY ({len(categorized.due_today)})")
+        print("-" * 50)
+        for p in categorized.due_today:
+            inst = p.installment
+            print(f"  {p.merchant} - Installment #{inst.installment_number}")
+            print(f"    ${inst.amount:.2f} - Due: {inst.due_date}")
+        print()
+
+    if categorized.upcoming:
+        print(f"📅 UPCOMING (Next {upcoming_days} Days) ({len(categorized.upcoming)})")
+        print("-" * 50)
+        for p in categorized.upcoming:
+            inst = p.installment
+            days_str = f"in {p.days_until_due} day" + ("s" if p.days_until_due > 1 else "")
+            print(f"  {p.merchant} - Installment #{inst.installment_number}")
+            print(f"    ${inst.amount:.2f} - Due: {inst.due_date} ({days_str})")
+        print()
+
+    if categorized.all_unpaid:
+        next_payment = categorized.all_unpaid[0]
+        inst = next_payment.installment
+        print("Next Payment Due")
+        print("-" * 50)
+        print(f"  {next_payment.merchant} - Installment #{inst.installment_number}")
+        print(f"  ${inst.amount:.2f} - Due: {inst.due_date}")
+        if next_payment.days_until_due < 0:
+            print(f"  Status: {abs(next_payment.days_until_due)} days overdue")
+        elif next_payment.days_until_due == 0:
+            print(f"  Status: Due today")
+        else:
+            print(f"  Status: Due in {next_payment.days_until_due} days")
+        print()
+
+    if categorized.future:
+        future_total = sum(p.installment.amount for p in categorized.future)
+        print(f"Future Payments (Beyond {upcoming_days} Days)")
+        print("-" * 50)
+        print(f"  Count: {len(categorized.future)}")
+        print(f"  Total: ${future_total:.2f}")
+        print()
+
+
 def overview(context: NavigationContext) -> CommandResult:
     print("\n=== Overview ===\n")
     plan_manager = context.get_data("plan_manager")
@@ -235,96 +419,9 @@ def overview(context: NavigationContext) -> CommandResult:
     upcoming_days = 30
     plans_dict = plan_manager.list_plans()
 
-    total_plans = len(plans_dict)
-    total_remaining = sum(plan.remaining_balance for plan in plans_dict.values())
-    total_paid = sum(
-        sum(inst.amount for inst in plan.installments if inst.status == PaymentStatus.PAID)
-        for plan in plans_dict.values()
-    )
-    fully_paid_count = sum(1 for plan in plans_dict.values() if plan.is_fully_paid)
-
-    all_unpaid = []
-    for plan_id, plan in plans_dict.items():
-        for inst in plan.unpaid_installments:
-            all_unpaid.append({
-                'plan_id': plan_id,
-                'merchant': plan.merchant_name,
-                'installment': inst,
-                'days_until_due': (inst.due_date - today).days
-            })
-
-    all_unpaid.sort(key=lambda x: x['installment'].due_date)
-
-    overdue = [p for p in all_unpaid if p['days_until_due'] < 0]
-    due_today = [p for p in all_unpaid if p['days_until_due'] == 0]
-    upcoming = [p for p in all_unpaid if 0 < p['days_until_due'] <= upcoming_days]
-    future = [p for p in all_unpaid if p['days_until_due'] > upcoming_days]
-
-    overdue_total = sum(p['installment'].amount for p in overdue)
-    due_today_total = sum(p['installment'].amount for p in due_today)
-    upcoming_total = sum(p['installment'].amount for p in upcoming)
-    next_30_days_total = overdue_total + due_today_total + upcoming_total
-
-    print("Summary Statistics")
-    print("-" * 50)
-    print(f"Total Plans: {total_plans} ({fully_paid_count} fully paid, {total_plans - fully_paid_count} active)")
-    print(f"Total Paid: ${total_paid:.2f}")
-    print(f"Total Remaining: ${total_remaining:.2f}")
-    print(f"Total Unpaid Installments: {len(all_unpaid)}")
-    print(f"Total Due in Next {upcoming_days} Days: ${next_30_days_total:.2f}")
-    print()
-
-    if overdue:
-        print(f"⚠️  OVERDUE PAYMENTS ({len(overdue)})")
-        print("-" * 50)
-        for p in overdue:
-            inst = p['installment']
-            days_overdue = abs(p['days_until_due'])
-            print(f"  {p['merchant']} - Installment #{inst.installment_number}")
-            print(f"    ${inst.amount:.2f} - Due: {inst.due_date} ({days_overdue} days overdue)")
-        print()
-
-    if due_today:
-        print(f"🔔 DUE TODAY ({len(due_today)})")
-        print("-" * 50)
-        for p in due_today:
-            inst = p['installment']
-            print(f"  {p['merchant']} - Installment #{inst.installment_number}")
-            print(f"    ${inst.amount:.2f} - Due: {inst.due_date}")
-        print()
-
-    if upcoming:
-        print(f"📅 UPCOMING (Next {upcoming_days} Days) ({len(upcoming)})")
-        print("-" * 50)
-        for p in upcoming:
-            inst = p['installment']
-            days_str = f"in {p['days_until_due']} day" + ("s" if p['days_until_due'] > 1 else "")
-            print(f"  {p['merchant']} - Installment #{inst.installment_number}")
-            print(f"    ${inst.amount:.2f} - Due: {inst.due_date} ({days_str})")
-        print()
-
-    if all_unpaid:
-        next_payment = all_unpaid[0]
-        inst = next_payment['installment']
-        print("Next Payment Due")
-        print("-" * 50)
-        print(f"  {next_payment['merchant']} - Installment #{inst.installment_number}")
-        print(f"  ${inst.amount:.2f} - Due: {inst.due_date}")
-        if next_payment['days_until_due'] < 0:
-            print(f"  Status: {abs(next_payment['days_until_due'])} days overdue")
-        elif next_payment['days_until_due'] == 0:
-            print(f"  Status: Due today")
-        else:
-            print(f"  Status: Due in {next_payment['days_until_due']} days")
-        print()
-
-    if future:
-        future_total = sum(p['installment'].amount for p in future)
-        print(f"Future Payments (Beyond {upcoming_days} Days)")
-        print("-" * 50)
-        print(f"  Count: {len(future)}")
-        print(f"  Total: ${future_total:.2f}")
-        print()
+    categorized = _categorize_unpaid_installments(plans_dict, today, upcoming_days)
+    stats = _calculate_payment_statistics(plans_dict, categorized)
+    _display_payment_overview(stats, categorized, upcoming_days)
 
     return CommandResult(message="Press Enter to continue...")
 
