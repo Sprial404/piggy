@@ -112,22 +112,12 @@ def list_installment_plans(context: NavigationContext) -> CommandResult:
 
 def view_plan_details(context: NavigationContext) -> CommandResult:
     print("\n=== View Plan Details ===\n")
-    plan_manager = context.get_data("plan_manager")
 
-    if not plan_manager.has_plans():
-        return CommandResult(message="No installment plans found.")
+    result = select_plan(context)
+    if not result:
+        return CommandResult(message="No plan selected.")
 
-    print("Available plans:")
-    plan_ids = list(plan_manager.list_plans().keys())
-    for idx, plan_id in enumerate(plan_ids, 1):
-        print(f"{idx}. {plan_id}")
-
-    choice = get_int_input("\nSelect plan number", min_val=1, max_val=len(plan_ids))
-    if not choice:
-        return CommandResult(message="Invalid selection.")
-
-    plan_id = plan_ids[choice - 1]
-    plan = plan_manager.get_plan(plan_id)
+    plan_id, plan = result
 
     print(f"\n=== {plan.merchant_name} ===")
     print(f"Total Amount: ${plan.total_amount}")
@@ -147,26 +137,13 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
 
 def mark_payment(context: NavigationContext) -> CommandResult:
     print("\n=== Mark Payment ===\n")
+
+    result = select_plan(context)
+    if not result:
+        return CommandResult(message="No plan selected.")
+
+    plan_id, plan = result
     plan_manager = context.get_data("plan_manager")
-
-    if not plan_manager.has_plans():
-        return CommandResult(message="No installment plans found.")
-
-    print("Available plans:")
-    plans_dict = plan_manager.list_plans()
-    plan_ids = list(plans_dict.keys())
-    for idx, plan_id in enumerate(plan_ids, 1):
-        plan = plans_dict[plan_id]
-        unpaid_count = len(plan.unpaid_installments)
-        paid_count = plan.num_installments - unpaid_count
-        print(f"{idx}. {plan_id} ({paid_count} paid, {unpaid_count} unpaid)")
-
-    choice = get_int_input("\nSelect plan number", min_val=1, max_val=len(plan_ids))
-    if not choice:
-        return CommandResult(message="Invalid selection.")
-
-    plan_id = plan_ids[choice - 1]
-    plan = plan_manager.get_plan(plan_id)
 
     print("\nAll installments:")
     for inst in plan.installments:
@@ -387,22 +364,13 @@ def load_plans(context: NavigationContext) -> CommandResult:
 
 def export_plan_csv(context: NavigationContext) -> CommandResult:
     print("\n=== Export Plan to CSV ===\n")
+
+    result = select_plan(context)
+    if not result:
+        return CommandResult(message="No plan selected.")
+
+    plan_id, plan = result
     plan_manager = context.get_data("plan_manager")
-
-    if not plan_manager.has_plans():
-        return CommandResult(message="No installment plans found.")
-
-    print("Available plans:")
-    plan_ids = list(plan_manager.list_plans().keys())
-    for idx, plan_id in enumerate(plan_ids, 1):
-        print(f"{idx}. {plan_id}")
-
-    choice = get_int_input("\nSelect plan number", min_val=1, max_val=len(plan_ids))
-    if not choice:
-        return CommandResult(message="Invalid selection.")
-
-    plan_id = plan_ids[choice - 1]
-    plan = plan_manager.get_plan(plan_id)
 
     plan_manager.storage_dir.mkdir(exist_ok=True)
 
