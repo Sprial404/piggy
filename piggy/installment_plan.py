@@ -4,7 +4,6 @@ from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
@@ -21,12 +20,12 @@ class Installment(BaseModel):
     amount: Decimal = Field(gt=0)
     due_date: date
     status: PaymentStatus = PaymentStatus.PENDING
-    paid_date: Optional[date] = None
+    paid_date: date | None = None
 
     # noinspection PyNestedDecorators
     @field_validator('paid_date', mode='after')
     @classmethod
-    def ensure_paid_date(cls, value: Optional[date], info: ValidationInfo) -> Optional[date]:
+    def ensure_paid_date(cls, value: date | None, info: ValidationInfo) -> date | None:
         if value is not None and info.data.get('status') != PaymentStatus.PAID:
             raise ValueError("paid_date can only be set when status is PAID")
         return value
@@ -89,7 +88,7 @@ class InstallmentPlan(BaseModel):
         return all(inst.status == PaymentStatus.PAID for inst in self.installments)
 
     @property
-    def next_payment_due(self) -> Optional[date]:
+    def next_payment_due(self) -> date | None:
         """Get the next payment due date"""
         unpaid = [
             inst for inst in self.installments
@@ -99,7 +98,7 @@ class InstallmentPlan(BaseModel):
             return None
         return min(inst.due_date for inst in unpaid)
 
-    def get_overdue_installments(self, as_of: Optional[date] = None) -> list[Installment]:
+    def get_overdue_installments(self, as_of: date | None = None) -> list[Installment]:
         """
         Get installments that are overdue.
 
@@ -119,7 +118,7 @@ class InstallmentPlan(BaseModel):
         """Check if any installments are overdue based on today's date"""
         return len(self.get_overdue_installments()) > 0
 
-    def update_overdue_status(self, as_of: Optional[date] = None) -> int:
+    def update_overdue_status(self, as_of: date | None = None) -> int:
         """
         Update status to OVERDUE for unpaid installments past their due date.
 
@@ -205,7 +204,7 @@ class InstallmentPlan(BaseModel):
             installments=installments
         )
 
-    def to_json(self, file_path: Optional[str] = None) -> str:
+    def to_json(self, file_path: str | None = None) -> str:
         """Serialize the installment plan to JSON format"""
         json_data = self.model_dump(mode='json')
         json_str = json.dumps(json_data, indent=2, default=str)

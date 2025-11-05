@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 from piggy.installment_plan import InstallmentPlan
 
@@ -30,7 +29,7 @@ class PlanManager:
         """
         self.plans[plan_id] = plan
 
-    def get_plan(self, plan_id: str) -> Optional[InstallmentPlan]:
+    def get_plan(self, plan_id: str) -> InstallmentPlan | None:
         """
         Retrieve a plan by ID.
 

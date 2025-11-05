@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Optional
+from typing import Any, Callable
 
 from piggy.installment_plan import InstallmentPlan, PaymentStatus, Installment
 from piggy.menu import (
@@ -204,10 +204,11 @@ def _display_installments(plan: InstallmentPlan) -> None:
     for inst in plan.installments:
         status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
         status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
-        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount} due {inst.due_date}{status_text}")
+        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount}"
+              f"due {inst.due_date}{status_text}")
 
 
-def select_installment(plan: InstallmentPlan) -> Optional[Installment]:
+def select_installment(plan: InstallmentPlan) -> Installment | None:
     """
     Display installments and prompt user to select one.
 
@@ -565,7 +566,7 @@ def export_plan_csv(context: NavigationContext) -> CommandResult:
 def select_plan(
     context: NavigationContext,
     prompt: str = "Select plan number"
-) -> Optional[tuple[str, InstallmentPlan]]:
+) -> tuple[str, InstallmentPlan] | None:
     plan_manager = context.get_data("plan_manager")
 
     if not plan_manager.has_plans():
@@ -688,6 +689,8 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
     if not plan:
         return CommandResult(message="No plan selected.")
 
+def _select_paid_installment(plan: InstallmentPlan) -> Installment | None:
+    """Select from paid installments only, showing paid dates."""
     paid_installments = [inst for inst in plan.installments if inst.status == PaymentStatus.PAID]
 
     if not paid_installments:

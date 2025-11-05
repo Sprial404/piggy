@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Any, Callable
+from typing import Any, Callable
 
 
 class NavigationAction(Enum):
@@ -17,12 +17,12 @@ class NavigationContext:
     def __init__(self):
         self._menu_stack: list['Menu'] = []
         self._shared_data: dict[str, Any] = {}
-        self._last_result: Optional['CommandResult'] = None
+        self._last_result: 'CommandResult' | None = None
 
     def push_menu(self, menu: 'Menu'):
         self._menu_stack.append(menu)
 
-    def pop_menu(self) -> Optional['Menu']:
+    def pop_menu(self) -> 'Menu' | None:
         if len(self._menu_stack) > 1:
             self._menu_stack.pop()
             return self.get_current_menu()
@@ -38,7 +38,7 @@ class NavigationContext:
         else:
             self._menu_stack.append(menu)
 
-    def get_current_menu(self) -> Optional['Menu']:
+    def get_current_menu(self) -> 'Menu' | None:
         return self._menu_stack[-1] if self._menu_stack else None
 
     def get_breadcrumb(self) -> str:
@@ -63,7 +63,7 @@ class NavigationContext:
         """Store the last command result for access by parent menus."""
         self._last_result = result
 
-    def get_last_return_value(self, default: Optional[Any] = None) -> Optional[Any]:
+    def get_last_return_value(self, default: Any | None = None) -> Any | None:
         """Get the return value from the last executed command."""
         if self._last_result:
             return self._last_result.return_value
@@ -77,9 +77,9 @@ class NavigationContext:
 @dataclass
 class CommandResult:
     action: NavigationAction = NavigationAction.NONE
-    target_menu: Optional['Menu'] = None
-    message: Optional[str] = None
-    return_value: Optional[Any] = None
+    target_menu: 'Menu' | None = None
+    message: str | None = None
+    return_value: Any | None = None
 
 
 class BaseCommand(ABC):
@@ -185,7 +185,7 @@ class MenuInterface:
     def __init__(
         self,
         start_menu: Menu,
-        context: Optional[NavigationContext] = None
+        context: NavigationContext | None = None
     ):
         self._context = context if context is not None else NavigationContext()
         self._context.push_menu(start_menu)
