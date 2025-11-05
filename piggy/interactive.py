@@ -345,21 +345,21 @@ def mark_payment(context: NavigationContext) -> CommandResult:
                 default=selected_inst.due_date
             )
 
-            selected_inst.status = PaymentStatus.PAID
-            selected_inst.paid_date = paid_date
+            selected_inst.mark_paid(paid_date)
             marked_count += 1
 
             print(f"✓ Installment #{selected_inst.installment_number} marked as paid on {paid_date}")
 
+        plan.updated_at = datetime.now()
         return CommandResult(message=_format_marking_result(marked_count, "paid"))
     else:
         for selected_inst in selected_installments:
-            selected_inst.status = PaymentStatus.PENDING
-            selected_inst.paid_date = None
+            selected_inst.mark_unpaid()
             marked_count += 1
 
             print(f"○ Installment #{selected_inst.installment_number} marked as unpaid")
 
+        plan.updated_at = datetime.now()
         return CommandResult(message=_format_marking_result(marked_count, "unpaid"))
 
 
@@ -644,7 +644,7 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
     if not new_name:
         return CommandResult(message="Merchant name cannot be empty.")
 
-    plan.merchant_name = new_name
+    plan.set_merchant_name(new_name)
 
     new_plan_id = generate_plan_id(new_name, plan.purchase_date, plan_manager)
     if new_plan_id != plan_id:
@@ -716,10 +716,7 @@ def _edit_installment_field(
 
 def edit_installment_amount(context: NavigationContext) -> CommandResult:
     def apply_amount_update(plan, installment, new_amount):
-        old_total = sum(inst.amount for inst in plan.installments)
-        difference = new_amount - installment.amount
-        installment.amount = new_amount
-        plan.total_amount = old_total + difference
+        plan.set_installment_amount(installment.installment_number, new_amount)
         return f"\nInstallment #{installment.installment_number} amount updated to ${new_amount}"\
                f"\nNew total: ${plan.total_amount}"
 
@@ -737,8 +734,8 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
 
 def edit_installment_due_date(context: NavigationContext) -> CommandResult:
     """Edit the due date of a specific installment"""
-    def apply_due_date_update(_plan, installment, new_due_date):
-        installment.due_date = new_due_date
+    def apply_due_date_update(plan, installment, new_due_date):
+        plan.set_installment_due_date(installment.installment_number, new_due_date)
         return f"\nInstallment #{installment.installment_number} due date updated to {new_due_date}"
 
     return _edit_installment_field(
@@ -780,8 +777,8 @@ def _select_paid_installment(plan: InstallmentPlan) -> Installment | None:
 
 
 def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
-    def apply_paid_date_update(_plan, installment, new_paid_date):
-        installment.paid_date = new_paid_date
+    def apply_paid_date_update(plan, installment, new_paid_date):
+        plan.set_installment_paid_date(installment.installment_number, new_paid_date)
         return f"\nInstallment #{installment.installment_number} paid date updated to {new_paid_date}"
 
     return _edit_installment_field(
