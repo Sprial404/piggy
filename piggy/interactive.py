@@ -207,6 +207,24 @@ def _display_installments(plan: InstallmentPlan) -> None:
         print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount} due {inst.due_date}{status_text}")
 
 
+def select_installment(plan: InstallmentPlan) -> Optional[Installment]:
+    """
+    Display installments and prompt user to select one.
+
+    :param plan: InstallmentPlan to select from
+    :return: Selected Installment or None if cancelled
+    """
+    print("\nInstallments:")
+    for inst in plan.installments:
+        print(format_installment_line(inst))
+
+    inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
+    if not inst_num:
+        return None
+
+    return plan.installments[inst_num - 1]
+
+
 def _parse_installment_numbers(input_str: str) -> list[int]:
     """
     Parse comma-separated installment numbers from user input.
@@ -606,15 +624,9 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
     if not plan:
         return CommandResult(message="No plan selected.")
 
-    print("\nInstallments:")
-    for inst in plan.installments:
-        print(format_installment_line(inst))
-
-    inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
-    if not inst_num:
+    selected_inst = select_installment(plan)
+    if not selected_inst:
         return CommandResult(message="Invalid selection.")
-
-    selected_inst = plan.installments[inst_num - 1]
 
     if selected_inst.status == PaymentStatus.PAID:
         print("\nWarning: This installment has already been paid.")
@@ -636,7 +648,7 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
     plan.total_amount = old_total + difference
 
     return CommandResult(
-        message=f"\nInstallment #{inst_num} amount updated to ${new_amount}\nNew total: ${plan.total_amount}"
+        message=f"\nInstallment #{selected_inst.installment_number} amount updated to ${new_amount}\nNew total: ${plan.total_amount}"
     )
 
 
@@ -651,15 +663,9 @@ def edit_installment_due_date(context: NavigationContext) -> CommandResult:
     if not plan:
         return CommandResult(message="No plan selected.")
 
-    print("\nInstallments:")
-    for inst in plan.installments:
-        print(format_installment_line(inst))
-
-    inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
-    if not inst_num:
+    selected_inst = select_installment(plan)
+    if not selected_inst:
         return CommandResult(message="Invalid selection.")
-
-    selected_inst = plan.installments[inst_num - 1]
 
     print(f"\nCurrent due date: {selected_inst.due_date}")
     new_due_date = get_date_input("New due date")
@@ -669,7 +675,7 @@ def edit_installment_due_date(context: NavigationContext) -> CommandResult:
 
     selected_inst.due_date = new_due_date
 
-    return CommandResult(message=f"\nInstallment #{inst_num} due date updated to {new_due_date}")
+    return CommandResult(message=f"\nInstallment #{selected_inst.installment_number} due date updated to {new_due_date}")
 
 
 def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
