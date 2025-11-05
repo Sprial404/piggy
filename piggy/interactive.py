@@ -168,6 +168,46 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     return CommandResult(message="\nPress Enter to continue...")
 
 
+def _display_installments(plan: InstallmentPlan) -> None:
+    """
+    Display all installments with their current status.
+
+    :param plan: InstallmentPlan to display
+    """
+    print("\nAll installments:")
+    for inst in plan.installments:
+        status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
+        status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
+        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount} due {inst.due_date}{status_text}")
+
+
+def _parse_installment_numbers(input_str: str) -> list[int]:
+    """
+    Parse comma-separated installment numbers from user input.
+
+    :param input_str: User input string (e.g., "1,2,3" or "1")
+    :return: List of installment numbers
+    :raises ValueError: If input contains invalid numbers
+    """
+    return [int(num.strip()) for num in input_str.split(',')]
+
+
+def _format_marking_result(count: int, action: str) -> str:
+    """
+    Format the result message for marking installments.
+
+    :param count: Number of installments marked
+    :param action: Action performed ("paid" or "unpaid")
+    :return: Formatted message string
+    """
+    if count == 0:
+        return f"\nNo installments were marked as {action}."
+    elif count == 1:
+        return f"\n{count} installment marked as {action}!"
+    else:
+        return f"\n{count} installments marked as {action}!"
+
+
 def mark_payment(context: NavigationContext) -> CommandResult:
     print("\n=== Mark Payment ===\n")
 
@@ -176,19 +216,12 @@ def mark_payment(context: NavigationContext) -> CommandResult:
         return CommandResult(message="No plan selected.")
 
     plan_id, plan = result
-    plan_manager = context.get_data("plan_manager")
-
-    print("\nAll installments:")
-    for inst in plan.installments:
-        status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
-        status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
-        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount} due {inst.due_date}{status_text}")
+    _display_installments(plan)
 
     print("\nWhat would you like to do?")
     print("1. Mark as paid")
     print("2. Mark as unpaid")
     action = get_input("Choose action", default="1")
-
     if action not in ["1", "2"]:
         return CommandResult(message="Invalid action selected.")
 
@@ -204,7 +237,7 @@ def mark_payment(context: NavigationContext) -> CommandResult:
         return CommandResult(message="No installments selected.")
 
     try:
-        selected_numbers = [int(num.strip()) for num in installment_input.split(',')]
+        selected_numbers = _parse_installment_numbers(installment_input)
     except ValueError:
         return CommandResult(message="Invalid input. Please use comma-separated numbers.")
 
@@ -227,34 +260,22 @@ def mark_payment(context: NavigationContext) -> CommandResult:
                 default=selected_inst.due_date
             )
 
-            if not paid_date:
-                print(f"Skipping installment #{selected_inst.installment_number} - no date provided.")
-                continue
-
             selected_inst.status = PaymentStatus.PAID
             selected_inst.paid_date = paid_date
             marked_count += 1
+
             print(f"✓ Installment #{selected_inst.installment_number} marked as paid on {paid_date}")
 
-        if marked_count == 0:
-            return CommandResult(message="\nNo installments were marked as paid.")
-        elif marked_count == 1:
-            return CommandResult(message=f"\n{marked_count} installment marked as paid!")
-        else:
-            return CommandResult(message=f"\n{marked_count} installments marked as paid!")
+        return CommandResult(message=_format_marking_result(marked_count, "paid"))
     else:
         for selected_inst in selected_installments:
             selected_inst.status = PaymentStatus.PENDING
             selected_inst.paid_date = None
             marked_count += 1
+
             print(f"○ Installment #{selected_inst.installment_number} marked as unpaid")
 
-        if marked_count == 0:
-            return CommandResult(message="\nNo installments were marked as unpaid.")
-        elif marked_count == 1:
-            return CommandResult(message=f"\n{marked_count} installment marked as unpaid!")
-        else:
-            return CommandResult(message=f"\n{marked_count} installments marked as unpaid!")
+        return CommandResult(message=_format_marking_result(marked_count, "unpaid"))
 
 
 def _calculate_payment_statistics(
