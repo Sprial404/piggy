@@ -8,6 +8,7 @@ from piggy.menu import (
     NavigationAction
 )
 from piggy.plan_manager import PlanManager
+from piggy.utils import get_project_root
 from piggy.utils.input import (
     get_input, get_decimal_input, get_date_input, get_int_input
 )
@@ -660,7 +661,11 @@ def exit_without_saving(_context: NavigationContext) -> CommandResult:
 
 
 def main():
-    plan_manager = PlanManager()
+    project_dir = get_project_root()
+    storage_dir = project_dir / "data"
+
+    plan_manager = PlanManager(storage_dir)
+
     context = NavigationContext()
     context.set_data("plan_manager", plan_manager)
 
