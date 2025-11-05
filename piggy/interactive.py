@@ -615,8 +615,32 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
     return CommandResult(message=f"\nMerchant name updated to: {new_name}")
 
 
-def edit_installment_amount(context: NavigationContext) -> CommandResult:
-    print("\n=== Edit Installment Amount ===\n")
+def _edit_installment_field(
+    context: NavigationContext,
+    heading: str,
+    field_name: str,
+    get_current_value: Callable[[Installment], Any],
+    prompt_new_value: Callable[[], Any],
+    validate_value: Callable[[Any], tuple[bool, str]],
+    apply_update: Callable[[InstallmentPlan, Installment, Any], str],
+    warn_if_paid: bool = False,
+    select_installment_fn: Callable[[InstallmentPlan], Installment | None] | None = None
+) -> CommandResult:
+    """
+    Generic helper for editing installment fields.
+
+    :param context: Navigation context
+    :param heading: Heading to display
+    :param field_name: Name of field being edited (for messages)
+    :param get_current_value: Function(installment) -> current value
+    :param prompt_new_value: Function() -> new value from user input
+    :param validate_value: Function(value) -> (is_valid, error_message)
+    :param apply_update: Function(plan, installment, new_value) -> success_message
+    :param warn_if_paid: Whether to warn if installment is already paid
+    :param select_installment_fn: Optional function(plan) -> installment for custom selection logic
+    :return: CommandResult
+    """
+    print(f"\n=== {heading} ===\n")
     plan_manager = context.get_data("plan_manager")
 
     plan_id = context.get_data("edit_plan_id")
@@ -625,99 +649,112 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
     if not plan:
         return CommandResult(message="No plan selected.")
 
-    selected_inst = select_installment(plan)
+    selector = select_installment_fn if select_installment_fn else select_installment
+    selected_inst = selector(plan)
     if not selected_inst:
         return CommandResult(message="Invalid selection.")
 
-    if selected_inst.status == PaymentStatus.PAID:
+    if warn_if_paid and selected_inst.status == PaymentStatus.PAID:
         print("\nWarning: This installment has already been paid.")
         confirm = get_input("Continue editing? (y/n)", default="n")
         if confirm.lower() != 'y':
             return CommandResult(message="Edit cancelled.")
 
-    print(f"\nCurrent amount: ${selected_inst.amount}")
-    new_amount = get_decimal_input("New amount")
+    current_value = get_current_value(selected_inst)
+    print(f"\nCurrent {field_name}: {current_value}")
 
-    if not new_amount or new_amount <= 0:
-        return CommandResult(message="Valid amount is required.")
+    new_value = prompt_new_value()
 
-    old_total = sum(inst.amount for inst in plan.installments)
-    difference = new_amount - selected_inst.amount
+    is_valid, error_msg = validate_value(new_value)
+    if not is_valid:
+        return CommandResult(message=error_msg)
 
-    selected_inst.amount = new_amount
+    success_msg = apply_update(plan, selected_inst, new_value)
 
-    plan.total_amount = old_total + difference
+    return CommandResult(message=success_msg)
 
-    return CommandResult(
-        message=f"\nInstallment #{selected_inst.installment_number} amount updated to ${new_amount}\nNew total: ${plan.total_amount}"
+
+def edit_installment_amount(context: NavigationContext) -> CommandResult:
+    def apply_amount_update(plan, installment, new_amount):
+        old_total = sum(inst.amount for inst in plan.installments)
+        difference = new_amount - installment.amount
+        installment.amount = new_amount
+        plan.total_amount = old_total + difference
+        return f"\nInstallment #{installment.installment_number} amount updated to ${new_amount}"\
+               f"\nNew total: ${plan.total_amount}"
+
+    return _edit_installment_field(
+        context=context,
+        heading="Edit Installment Amount",
+        field_name="amount",
+        get_current_value=lambda inst: f"${inst.amount}",
+        prompt_new_value=lambda: get_decimal_input("New amount"),
+        validate_value=lambda val: (True, "") if val and val > 0 else (False, "Valid amount is required."),
+        apply_update=apply_amount_update,
+        warn_if_paid=True
     )
 
 
 def edit_installment_due_date(context: NavigationContext) -> CommandResult:
     """Edit the due date of a specific installment"""
-    print("\n=== Edit Installment Due Date ===\n")
-    plan_manager = context.get_data("plan_manager")
+    def apply_due_date_update(_plan, installment, new_due_date):
+        installment.due_date = new_due_date
+        return f"\nInstallment #{installment.installment_number} due date updated to {new_due_date}"
 
-    plan_id = context.get_data("edit_plan_id")
-    plan = plan_manager.get_plan(plan_id) if plan_id else None
+    return _edit_installment_field(
+        context=context,
+        heading="Edit Installment Due Date",
+        field_name="due date",
+        get_current_value=lambda inst: inst.due_date,
+        prompt_new_value=lambda: get_date_input("New due date"),
+        validate_value=lambda val: (True, "") if val else (False, "Due date is required."),
+        apply_update=apply_due_date_update,
+        warn_if_paid=False
+    )
 
-    if not plan:
-        return CommandResult(message="No plan selected.")
-
-    selected_inst = select_installment(plan)
-    if not selected_inst:
-        return CommandResult(message="Invalid selection.")
-
-    print(f"\nCurrent due date: {selected_inst.due_date}")
-    new_due_date = get_date_input("New due date")
-
-    if not new_due_date:
-        return CommandResult(message="Due date is required.")
-
-    selected_inst.due_date = new_due_date
-
-    return CommandResult(message=f"\nInstallment #{selected_inst.installment_number} due date updated to {new_due_date}")
-
-
-def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
-    print("\n=== Edit Installment Paid Date ===\n")
-    plan_manager = context.get_data("plan_manager")
-
-    plan_id = context.get_data("edit_plan_id")
-    plan = plan_manager.get_plan(plan_id) if plan_id else None
-
-    if not plan:
-        return CommandResult(message="No plan selected.")
 
 def _select_paid_installment(plan: InstallmentPlan) -> Installment | None:
     """Select from paid installments only, showing paid dates."""
     paid_installments = [inst for inst in plan.installments if inst.status == PaymentStatus.PAID]
 
     if not paid_installments:
-        return CommandResult(message="No paid installments to edit.")
+        print("No paid installments to edit.")
+        return None
 
-    print("\nPaid installments:")
+    print("Paid installments:")
     for inst in paid_installments:
-        print(f"  {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount} - Paid on {inst.paid_date}")
+        print(f"  {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount}"
+              f" - Paid on {inst.paid_date}")
 
     inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
     if not inst_num:
-        return CommandResult(message="Invalid selection.")
+        return None
 
     selected_inst = plan.installments[inst_num - 1]
 
     if selected_inst.status != PaymentStatus.PAID:
-        return CommandResult(message=f"Installment #{inst_num} is not marked as paid.")
+        print(f"Installment #{inst_num} is not marked as paid.")
+        return None
 
-    print(f"\nCurrent paid date: {selected_inst.paid_date}")
-    new_paid_date = get_date_input("New paid date", default=selected_inst.paid_date)
+    return selected_inst
 
-    if not new_paid_date:
-        return CommandResult(message="Paid date is required.")
 
-    selected_inst.paid_date = new_paid_date
+def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
+    def apply_paid_date_update(_plan, installment, new_paid_date):
+        installment.paid_date = new_paid_date
+        return f"\nInstallment #{installment.installment_number} paid date updated to {new_paid_date}"
 
-    return CommandResult(message=f"\nInstallment #{inst_num} paid date updated to {new_paid_date}")
+    return _edit_installment_field(
+        context=context,
+        heading="Edit Installment Paid Date",
+        field_name="paid date",
+        get_current_value=lambda inst: inst.paid_date or "Not set",
+        prompt_new_value=lambda: get_date_input("New paid date", default=None),
+        validate_value=lambda val: (True, "") if val else (False, "Paid date is required."),
+        apply_update=apply_paid_date_update,
+        warn_if_paid=False,
+        select_installment_fn=_select_paid_installment
+    )
 
 
 def delete_plan(context: NavigationContext) -> CommandResult:
