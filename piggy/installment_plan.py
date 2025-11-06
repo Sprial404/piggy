@@ -1,4 +1,3 @@
-import csv
 import json
 from datetime import date, datetime
 from decimal import Decimal
@@ -368,36 +367,42 @@ class InstallmentPlan(BaseModel):
         json_str = Path(file_path).read_text(encoding='utf-8')
         return cls.from_json(json_str)
 
-    def to_csv(self, file_path: str) -> None:
-        """Export installment plan data to CSV format"""
-        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.writer(csvfile)
-            
-            # Write header
-            writer.writerow(['Field', 'Value'])
-            
-            # Write plan metadata
-            writer.writerow(['Merchant Name', self.merchant_name])
-            writer.writerow(['Total Amount', str(self.total_amount)])
-            writer.writerow(['Purchase Date', self.purchase_date.isoformat()])
-            writer.writerow(['Created At', self.created_at.isoformat()])
-            writer.writerow(['Updated At', self.updated_at.isoformat()])
-            writer.writerow(['Number of Installments', self.num_installments])
-            writer.writerow(['Remaining Balance', str(self.remaining_balance)])
-            writer.writerow(['Is Fully Paid', self.is_fully_paid])
-            next_due = self.next_payment_due
-            writer.writerow(['Next Payment Due', next_due.isoformat() if next_due else 'None'])
-            writer.writerow([])  # Empty row
-            
-            # Write installments header
-            writer.writerow(['Installment Number', 'Amount', 'Due Date', 'Status', 'Paid Date'])
-            
-            # Write installments
-            for inst in self.installments:
-                writer.writerow([
-                    inst.installment_number,
-                    str(inst.amount),
-                    inst.due_date.isoformat(),
-                    inst.status.value,
-                    inst.paid_date.isoformat() if inst.paid_date else ''
-                ])
+    def to_csv(self, file_path: str) -> str:
+        """
+        Export installment plan data to CSV format (flattened structure).
+
+        Creates one row per installment with plan-level data repeated.
+        Includes all timestamps and computed properties for data analysis.
+
+        :param file_path: File path to save CSV
+        :return: CSV content as string
+        """
+        from piggy.utils.csv_writer import write_csv_from_dicts, format_value
+
+        headers = [
+            'merchant_name', 'total_amount', 'purchase_date',
+            'created_at', 'updated_at', 'installment_number',
+            'amount', 'due_date', 'status', 'paid_date',
+            'is_paid', 'is_pending', 'is_overdue'
+        ]
+
+        rows = [
+            {
+                'merchant_name': self.merchant_name,
+                'total_amount': format_value(self.total_amount),
+                'purchase_date': format_value(self.purchase_date),
+                'created_at': format_value(self.created_at),
+                'updated_at': format_value(self.updated_at),
+                'installment_number': inst.installment_number,
+                'amount': format_value(inst.amount),
+                'due_date': format_value(inst.due_date),
+                'status': inst.status.value,
+                'paid_date': format_value(inst.paid_date),
+                'is_paid': inst.is_paid,
+                'is_pending': inst.is_pending,
+                'is_overdue': inst.is_overdue
+            }
+            for inst in self.installments
+        ]
+
+        return write_csv_from_dicts(headers, rows, file_path)
