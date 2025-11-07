@@ -21,7 +21,7 @@ def get_input(prompt: str, default: str | None = None) -> str | None:
     :return: The user's input, or the default value if empty input is provided, or None
              if no default is set and the user enters nothing.
     """
-    if default:
+    if default is not None:
         user_input = input(f"{prompt} [{default}]: ").strip()
         return user_input if user_input else default
 
@@ -82,7 +82,7 @@ b
     """
     while True:
         try:
-            if default:
+            if default is not None:
                 value = input(f"{prompt} (YYYY-MM-DD) [{default}]: ").strip()
                 if not value:
                     return default
