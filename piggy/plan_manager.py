@@ -81,7 +81,7 @@ class PlanManager:
                 file_path = self.storage_dir / f"{plan_id}.json"
                 plan.to_json(str(file_path))
                 saved_count += 1
-            except Exception as e:
+            except (OSError, IOError) as e:
                 errors.append(f"Error saving {plan_id}: {e}")
 
         return saved_count, errors
@@ -108,7 +108,7 @@ class PlanManager:
                 plan_id = file_path.stem
                 self.plans[plan_id] = plan
                 loaded_count += 1
-            except Exception as e:
+            except (OSError, IOError, ValueError) as e:
                 errors.append(f"Error loading {file_path.name}: {e}")
 
         return loaded_count, errors

@@ -160,7 +160,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
         return CommandResult(
             message=f"\nInstallment plan created successfully!\nPlan ID: {plan_id}"
         )
-    except Exception as e:
+    except ValueError as e:
         return CommandResult(message=f"Error creating plan: {e}")
 
 
@@ -599,7 +599,7 @@ def export_plan_csv(context: NavigationContext) -> CommandResult:
     try:
         plan.to_csv(str(csv_path))
         return CommandResult(message=f"\nPlan exported to {csv_path}")
-    except Exception as e:
+    except (OSError, IOError) as e:
         return CommandResult(message=f"Error exporting plan: {e}")
 
 
