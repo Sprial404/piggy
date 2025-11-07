@@ -73,7 +73,7 @@ def get_date_input(prompt: str, default: None = None) -> date | None: ...
 def get_date_input(prompt: str, default: date | None = None) -> date | None:
     """
     Get date input in ISO 8601 format from the user with optional default value.
-b
+
     :param prompt: The prompt to display to the user.
     :param default: The default date to return if the user enters nothing. If provided,
                     it will be shown in brackets after the prompt in ISO 8601 format.
