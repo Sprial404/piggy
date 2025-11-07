@@ -3,6 +3,8 @@ from datetime import date, datetime, timedelta
 from enum import IntEnum
 from typing import Any, Callable, TypedDict
 
+from pydantic import ValidationError
+
 from piggy.installment_plan import InstallmentPlan, PaymentStatus, Installment
 from piggy.menu import (
     MenuInterface, NavigationContext, Menu, Command, CommandResult,
@@ -100,16 +102,8 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
         return CommandResult(message="Merchant name is required.")
 
     total_amount = get_decimal_input("Total amount")
-    if not total_amount or total_amount <= 0:
-        return CommandResult(message="Valid total amount is required.")
-
     purchase_date = get_date_input("Purchase date", default=date.today())
-    if not purchase_date:
-        return CommandResult(message="Purchase date is required.")
-
     num_installments = get_int_input("Number of installments", min_val=1)
-    if not num_installments or num_installments < 1:
-        return CommandResult(message="Valid number of installments is required.")
 
     installment_amount = total_amount / num_installments
 
@@ -160,7 +154,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
         return CommandResult(
             message=f"\nInstallment plan created successfully!\nPlan ID: {plan_id}"
         )
-    except ValueError as e:
+    except (ValueError, ValidationError) as e:
         return CommandResult(message=f"Error creating plan: {e}")
 
 
