@@ -135,10 +135,7 @@ class InstallmentPlan(BaseModel):
     @property
     def remaining_balance(self) -> Decimal:
         """Calculate the remaining balance from unpaid installments"""
-        total = Decimal()
-        for inst in self.unpaid_installments:
-            total += inst.amount
-        return total
+        return sum((inst.amount for inst in self.unpaid_installments), start=Decimal(0))
 
     @property
     def is_fully_paid(self) -> bool:
