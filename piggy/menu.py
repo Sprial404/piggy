@@ -139,9 +139,17 @@ class SubMenuCommand(BaseCommand):
 
 
 class Menu:
-    def __init__(self, title: str):
+    def __init__(self, title: str, sort_commands: bool = False):
+        """
+        Initialize a menu.
+
+        :param title: Menu title to display
+        :param sort_commands: Whether to sort commands alphabetically. If False (default),
+                              commands display in insertion order.
+        """
         self._title = title
         self._commands: dict[str, BaseCommand] = {}
+        self._sort_commands = sort_commands
 
     @property
     def title(self) -> str:
@@ -161,7 +169,8 @@ class Menu:
     def display(self):
         print(f"{self._title}")
 
-        for key, command in sorted(self._commands.items()):
+        items = sorted(self._commands.items()) if self._sort_commands else self._commands.items()
+        for key, command in items:
             print(f"{key}. {command.description()}")
 
     def handle_input(self, choice: str, context: NavigationContext) -> CommandResult:
