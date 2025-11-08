@@ -54,13 +54,13 @@ class PaymentStatistics:
     """Summary statistics for payment overview."""
     total_plans: int
     fully_paid_count: int
-    total_paid: float
-    total_remaining: float
+    total_paid: Decimal
+    total_remaining: Decimal
     total_unpaid_installments: int
-    overdue_total: float
-    due_today_total: float
-    upcoming_total: float
-    next_30_days_total: float
+    overdue_total: Decimal
+    due_today_total: Decimal
+    upcoming_total: Decimal
+    next_30_days_total: Decimal
 
 
 def generate_plan_id(merchant_name: str, purchase_date: date, plan_manager: PlanManager | None = None) -> str:
@@ -380,16 +380,17 @@ def _calculate_payment_statistics(
     :return: PaymentStatistics with calculated values
     """
     total_plans = len(plans_dict)
-    total_remaining = sum(plan.remaining_balance for plan in plans_dict.values())
+    total_remaining = sum((plan.remaining_balance for plan in plans_dict.values()), start=Decimal(0))
     total_paid = sum(
-        sum(inst.amount for inst in plan.installments if inst.status == PaymentStatus.PAID)
-        for plan in plans_dict.values()
+        (sum((inst.amount for inst in plan.installments if inst.status == PaymentStatus.PAID), start=Decimal(0))
+         for plan in plans_dict.values()),
+        start=Decimal(0)
     )
     fully_paid_count = sum(1 for plan in plans_dict.values() if plan.is_fully_paid)
 
-    overdue_total = sum(p.installment.amount for p in categorized['overdue'])
-    due_today_total = sum(p.installment.amount for p in categorized['due_today'])
-    upcoming_total = sum(p.installment.amount for p in categorized['upcoming'])
+    overdue_total = sum((p.installment.amount for p in categorized['overdue']), start=Decimal(0))
+    due_today_total = sum((p.installment.amount for p in categorized['due_today']), start=Decimal(0))
+    upcoming_total = sum((p.installment.amount for p in categorized['upcoming']), start=Decimal(0))
     next_30_days_total = overdue_total + due_today_total + upcoming_total
 
     return PaymentStatistics(
@@ -460,10 +461,10 @@ def _display_payment_overview(
     print("-" * 50)
     active_count = stats.total_plans - stats.fully_paid_count
     print(f"Total Plans: {stats.total_plans} ({stats.fully_paid_count} fully paid, {active_count} active)")
-    print(f"Total Paid: {format_currency(Decimal(str(stats.total_paid)))}")
-    print(f"Total Remaining: {format_currency(Decimal(str(stats.total_remaining)))}")
+    print(f"Total Paid: {format_currency(stats.total_paid)}")
+    print(f"Total Remaining: {format_currency(stats.total_remaining)}")
     print(f"Total Unpaid Installments: {stats.total_unpaid_installments}")
-    print(f"Total Due in Next {upcoming_days} Days: {format_currency(Decimal(str(stats.next_30_days_total)))}")
+    print(f"Total Due in Next {upcoming_days} Days: {format_currency(stats.next_30_days_total)}")
     print()
 
     if categorized['overdue']:
