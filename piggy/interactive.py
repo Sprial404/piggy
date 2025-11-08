@@ -89,7 +89,7 @@ def generate_plan_id(merchant_name: str, purchase_date: date, plan_manager: Plan
     return plan_id
 
 
-def print_heading(heading: str):
+def print_heading(heading: str) -> None:
     print(f"\n=== {heading} ===\n")
 
 
@@ -863,7 +863,7 @@ def exit_without_saving(_context: NavigationContext) -> CommandResult:
     return CommandResult(action=NavigationAction.EXIT)
 
 
-def main():
+def main() -> None:
     project_dir = get_project_root()
     storage_dir = project_dir / "data"
 
