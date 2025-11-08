@@ -356,6 +356,8 @@ def mark_payment(context: NavigationContext) -> CommandResult:
             print(f"✓ Installment #{selected_inst.installment_number} marked as paid on {paid_date}")
 
         plan.updated_at = datetime.now()
+        plan_manager: PlanManager = context.get_data(ContextKeys.PLAN_MANAGER)
+        plan_manager.mark_as_modified()
         return CommandResult(message=_format_marking_result(marked_count, "paid"))
     else:
         for selected_inst in selected_installments:
@@ -365,6 +367,8 @@ def mark_payment(context: NavigationContext) -> CommandResult:
             print(f"○ Installment #{selected_inst.installment_number} marked as unpaid")
 
         plan.updated_at = datetime.now()
+        plan_manager: PlanManager = context.get_data(ContextKeys.PLAN_MANAGER)
+        plan_manager.mark_as_modified()
         return CommandResult(message=_format_marking_result(marked_count, "unpaid"))
 
 
@@ -657,6 +661,8 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
         plan_manager.remove_plan(plan_id)
         plan_manager.add_plan(new_plan_id, plan)
         context.set_data(ContextKeys.EDIT_PLAN_ID, new_plan_id)
+    else:
+        plan_manager.mark_as_modified()
 
     return CommandResult(message=f"\nMerchant name updated to: {new_name}")
 
@@ -716,6 +722,7 @@ def _edit_installment_field(
         return CommandResult(message=error_msg)
 
     success_msg = apply_update(plan, selected_inst, new_value)
+    plan_manager.mark_as_modified()
 
     return CommandResult(message=success_msg)
 
@@ -871,8 +878,42 @@ def save_and_exit(context: NavigationContext) -> CommandResult:
     return CommandResult(action=NavigationAction.EXIT)
 
 
-def exit_without_saving(_context: NavigationContext) -> CommandResult:
-    return CommandResult(action=NavigationAction.EXIT)
+def exit_without_saving(context: NavigationContext) -> CommandResult:
+    """
+    Exit the application with confirmation if there are unsaved changes.
+
+    :param context: Navigation context
+    :return: CommandResult with EXIT action or NONE to cancel
+    """
+    plan_manager: PlanManager = context.get_data(ContextKeys.PLAN_MANAGER)
+
+    if not plan_manager.has_unsaved_changes():
+        return CommandResult(action=NavigationAction.EXIT)
+
+    print("\n" + "=" * 50)
+    print("WARNING: You have unsaved changes!")
+    print("=" * 50)
+    print("\nWhat would you like to do?")
+    print("  1. Save and exit")
+    print("  2. Exit without saving")
+    print("  3. Cancel (stay in app)")
+
+    choice = get_int_input("\nChoice", min_val=1, max_val=3)
+
+    if choice == 1:
+        saved_count, errors = plan_manager.save_all()
+        if errors:
+            print("\nErrors occurred while saving:")
+            for error in errors:
+                print(f"  - {error}")
+            print(f"\nSaved {saved_count} plan(s) successfully.")
+        else:
+            print(f"\nSuccessfully saved {saved_count} plan(s).")
+        return CommandResult(action=NavigationAction.EXIT)
+    elif choice == 2:
+        return CommandResult(action=NavigationAction.EXIT)
+    else:  # choice == 3
+        return CommandResult(action=NavigationAction.NONE, message="Cancelled exit.")
 
 
 def main() -> None:

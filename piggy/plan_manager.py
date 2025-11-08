@@ -19,6 +19,7 @@ class PlanManager:
         """
         self.storage_dir = storage_dir
         self.plans: dict[str, InstallmentPlan] = {}
+        self._has_unsaved_changes = False
 
     def add_plan(self, plan_id: str, plan: InstallmentPlan) -> None:
         """
@@ -28,6 +29,7 @@ class PlanManager:
         :param plan: InstallmentPlan instance to store
         """
         self.plans[plan_id] = plan
+        self._has_unsaved_changes = True
 
     def get_plan(self, plan_id: str) -> InstallmentPlan | None:
         """
@@ -47,6 +49,7 @@ class PlanManager:
         """
         if plan_id in self.plans:
             del self.plans[plan_id]
+            self._has_unsaved_changes = True
             return True
         return False
 
@@ -76,6 +79,18 @@ class PlanManager:
         """
         return self.storage_dir / f"{plan_id}.{extension}"
 
+    def has_unsaved_changes(self) -> bool:
+        """
+        Check if there are unsaved changes.
+
+        :return: True if changes have been made since last save, False otherwise
+        """
+        return self._has_unsaved_changes
+
+    def mark_as_modified(self) -> None:
+        """Mark that plans have been modified."""
+        self._has_unsaved_changes = True
+
     def save_all(self) -> tuple[int, list[str]]:
         """
         Save all plans to disk.
@@ -93,6 +108,9 @@ class PlanManager:
                 saved_count += 1
             except (OSError, IOError) as e:
                 errors.append(f"Error saving {plan_id}: {e}")
+
+        if saved_count > 0:
+            self._has_unsaved_changes = False
 
         return saved_count, errors
 
