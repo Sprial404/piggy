@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from enum import IntEnum
 from typing import Any, Callable, TypedDict
 
@@ -93,6 +94,16 @@ def print_heading(heading: str) -> None:
     print(f"\n=== {heading} ===\n")
 
 
+def format_currency(amount: Decimal) -> str:
+    """
+    Format a Decimal amount as currency.
+
+    :param amount: Amount to format
+    :return: Formatted currency string with $ prefix and 2 decimal places
+    """
+    return f"${amount:.2f}"
+
+
 def create_installment_plan(context: NavigationContext) -> CommandResult:
     print_heading("Create New Installment Plan")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
@@ -107,7 +118,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
 
     installment_amount = total_amount / num_installments
 
-    print(f"\nEach installment will be: ${installment_amount:.2f}")
+    print(f"\nEach installment will be: {format_currency(installment_amount)}")
 
     print("\nPayment frequency:")
     print("1. Monthly")
@@ -168,8 +179,8 @@ def list_installment_plans(context: NavigationContext) -> CommandResult:
     for plan_id, plan in plan_manager.list_plans().items():
         print(f"\nPlan ID: {plan_id}")
         print(f"  Merchant: {plan.merchant_name}")
-        print(f"  Total: ${plan.total_amount}")
-        print(f"  Remaining: ${plan.remaining_balance}")
+        print(f"  Total: {format_currency(plan.total_amount)}")
+        print(f"  Remaining: {format_currency(plan.remaining_balance)}")
         print(f"  Installments: {len(plan.unpaid_installments)}/{plan.num_installments} remaining")
         print(f"  Next due: {plan.next_payment_due or 'N/A'}")
         print(f"  Status: {'Fully Paid' if plan.is_fully_paid else 'Active'}")
@@ -187,9 +198,9 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     plan_id, plan = result
 
     print(f"\n=== {plan.merchant_name} ===")
-    print(f"Total Amount: ${plan.total_amount}")
+    print(f"Total Amount: {format_currency(plan.total_amount)}")
     print(f"Purchase Date: {plan.purchase_date}")
-    print(f"Remaining Balance: ${plan.remaining_balance}")
+    print(f"Remaining Balance: {format_currency(plan.remaining_balance)}")
     print(f"Next Payment Due: {plan.next_payment_due or 'N/A'}")
     print(f"\nInstallments:")
 
@@ -217,7 +228,7 @@ def format_installment_line(
     :return: Formatted installment line
     """
     status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
-    line = f"{indent}{status_symbol} #{inst.installment_number}: ${inst.amount} due {inst.due_date}"
+    line = f"{indent}{status_symbol} #{inst.installment_number}: {format_currency(inst.amount)} due {inst.due_date}"
 
     if show_status:
         line += f" [{inst.status.value}]"
@@ -238,7 +249,7 @@ def _display_installments(plan: InstallmentPlan) -> None:
     for inst in plan.installments:
         status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
         status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
-        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount}"
+        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: {format_currency(inst.amount)}"
               f"due {inst.due_date}{status_text}")
 
 
@@ -449,10 +460,10 @@ def _display_payment_overview(
     print("-" * 50)
     active_count = stats.total_plans - stats.fully_paid_count
     print(f"Total Plans: {stats.total_plans} ({stats.fully_paid_count} fully paid, {active_count} active)")
-    print(f"Total Paid: ${stats.total_paid:.2f}")
-    print(f"Total Remaining: ${stats.total_remaining:.2f}")
+    print(f"Total Paid: {format_currency(Decimal(str(stats.total_paid)))}")
+    print(f"Total Remaining: {format_currency(Decimal(str(stats.total_remaining)))}")
     print(f"Total Unpaid Installments: {stats.total_unpaid_installments}")
-    print(f"Total Due in Next {upcoming_days} Days: ${stats.next_30_days_total:.2f}")
+    print(f"Total Due in Next {upcoming_days} Days: {format_currency(Decimal(str(stats.next_30_days_total)))}")
     print()
 
     if categorized['overdue']:
@@ -462,7 +473,7 @@ def _display_payment_overview(
             inst = p.installment
             days_overdue = abs(p.days_until_due)
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
-            print(f"    ${inst.amount:.2f} - Due: {inst.due_date} ({days_overdue} days overdue)")
+            print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_overdue} days overdue)")
         print()
 
     if categorized['due_today']:
@@ -471,7 +482,7 @@ def _display_payment_overview(
         for p in categorized['due_today']:
             inst = p.installment
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
-            print(f"    ${inst.amount:.2f} - Due: {inst.due_date}")
+            print(f"    {format_currency(inst.amount)} - Due: {inst.due_date}")
         print()
 
     if categorized['upcoming']:
@@ -481,7 +492,7 @@ def _display_payment_overview(
             inst = p.installment
             days_str = f"in {p.days_until_due} day" + ("s" if p.days_until_due > 1 else "")
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
-            print(f"    ${inst.amount:.2f} - Due: {inst.due_date} ({days_str})")
+            print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_str})")
         print()
 
     if categorized['all_unpaid']:
@@ -490,7 +501,7 @@ def _display_payment_overview(
         print("Next Payment Due")
         print("-" * 50)
         print(f"  {next_payment.merchant} - Installment #{inst.installment_number}")
-        print(f"  ${inst.amount:.2f} - Due: {inst.due_date}")
+        print(f"  {format_currency(inst.amount)} - Due: {inst.due_date}")
         if next_payment.days_until_due < 0:
             print(f"  Status: {abs(next_payment.days_until_due)} days overdue")
         elif next_payment.days_until_due == 0:
@@ -504,7 +515,7 @@ def _display_payment_overview(
         print(f"Future Payments (Beyond {upcoming_days} Days)")
         print("-" * 50)
         print(f"  Count: {len(categorized['future'])}")
-        print(f"  Total: ${future_total:.2f}")
+        print(f"  Total: {format_currency(future_total)}")
         print()
 
 
@@ -612,7 +623,7 @@ def select_plan(
     plan_ids = list(plans_dict.keys())
     for idx, plan_id in enumerate(plan_ids, 1):
         plan = plans_dict[plan_id]
-        print(f"{idx}. {plan_id} - ${plan.total_amount} ({plan.merchant_name})")
+        print(f"{idx}. {plan_id} - {format_currency(plan.total_amount)} ({plan.merchant_name})")
 
     choice = get_int_input(f"\n{prompt}", min_val=1, max_val=len(plan_ids))
     if not choice:
@@ -711,14 +722,14 @@ def _edit_installment_field(
 def edit_installment_amount(context: NavigationContext) -> CommandResult:
     def apply_amount_update(plan, installment, new_amount):
         plan.set_installment_amount(installment.installment_number, new_amount)
-        return f"\nInstallment #{installment.installment_number} amount updated to ${new_amount}"\
-               f"\nNew total: ${plan.total_amount}"
+        return f"\nInstallment #{installment.installment_number} amount updated to {format_currency(new_amount)}"\
+               f"\nNew total: {format_currency(plan.total_amount)}"
 
     return _edit_installment_field(
         context=context,
         heading="Edit Installment Amount",
         field_name="amount",
-        get_current_value=lambda inst: f"${inst.amount}",
+        get_current_value=lambda inst: format_currency(inst.amount),
         prompt_new_value=lambda: get_decimal_input("New amount"),
         validate_value=lambda val: (True, "") if val and val > 0 else (False, "Valid amount is required."),
         apply_update=apply_amount_update,
@@ -754,7 +765,7 @@ def _select_paid_installment(plan: InstallmentPlan) -> Installment | None:
 
     print("Paid installments:")
     for inst in paid_installments:
-        print(f"  {inst.installment_number}. Installment #{inst.installment_number}: ${inst.amount}"
+        print(f"  {inst.installment_number}. Installment #{inst.installment_number}: {format_currency(inst.amount)}"
               f" - Paid on {inst.paid_date}")
 
     inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
@@ -799,8 +810,8 @@ def delete_plan(context: NavigationContext) -> CommandResult:
         return CommandResult(message="No plan selected.")
 
     print(f"\nPlan: {plan.merchant_name}")
-    print(f"Total: ${plan.total_amount}")
-    print(f"Remaining: ${plan.remaining_balance}")
+    print(f"Total: {format_currency(plan.total_amount)}")
+    print(f"Remaining: {format_currency(plan.remaining_balance)}")
 
     confirm = get_input(
         "\nAre you sure you want to delete this plan? (yes/no)",
@@ -831,8 +842,8 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
     context.set_data(ContextKeys.EDIT_PLAN_ID, plan_id)
 
     print(f"\nEditing plan: {plan.merchant_name}")
-    print(f"Total: ${plan.total_amount}")
-    print(f"Remaining: ${plan.remaining_balance}")
+    print(f"Total: {format_currency(plan.total_amount)}")
+    print(f"Remaining: {format_currency(plan.remaining_balance)}")
     print()
 
     edit_menu = Menu(f"Edit: {plan.merchant_name}")
