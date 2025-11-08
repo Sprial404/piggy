@@ -905,8 +905,10 @@ def main() -> None:
     loaded_count, errors = plan_manager.load_all()
     if loaded_count > 0:
         print(f"Loaded {loaded_count} saved plan(s)")
-    for error in errors:
-        print(error)
+    if errors:
+        print("Errors occurred while loading plans:")
+        for error in errors:
+            print(f"  - {error}")
     if loaded_count > 0 or errors:
         print()
 
