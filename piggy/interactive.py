@@ -437,7 +437,9 @@ def _categorize_unpaid_installments(
     """
     all_unpaid = []
     for plan_id, plan in plans_dict.items():
-        for inst in plan.unpaid_installments:
+        # Cache unpaid_installments to avoid repeated property access
+        unpaid = plan.unpaid_installments
+        for inst in unpaid:
             all_unpaid.append(PaymentInfo(
                 plan_id=plan_id,
                 merchant=plan.merchant_name,
