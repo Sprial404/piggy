@@ -170,6 +170,12 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
 
 
 def list_installment_plans(context: NavigationContext) -> CommandResult:
+    """
+    Display a summary list of all installment plans.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with continuation message
+    """
     print_heading("List Installment Plans")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
@@ -189,6 +195,12 @@ def list_installment_plans(context: NavigationContext) -> CommandResult:
 
 
 def view_plan_details(context: NavigationContext) -> CommandResult:
+    """
+    Display detailed information for a selected installment plan.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with continuation message
+    """
     print("\n=== View Plan Details ===\n")
 
     result = select_plan(context)
@@ -563,6 +575,12 @@ def _save_all_plans(plan_manager: PlanManager) -> tuple[int, list[str]]:
 
 
 def save_plans(context: NavigationContext) -> CommandResult:
+    """
+    Save all installment plans to disk.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with save status message
+    """
     print("\n=== Save Plans ===\n")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
@@ -577,6 +595,12 @@ def save_plans(context: NavigationContext) -> CommandResult:
 
 
 def load_plans(context: NavigationContext) -> CommandResult:
+    """
+    Load all installment plans from disk.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with load status message
+    """
     print("\n=== Load Plans ===\n")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
@@ -594,6 +618,12 @@ def load_plans(context: NavigationContext) -> CommandResult:
 
 
 def export_plan_csv(context: NavigationContext) -> CommandResult:
+    """
+    Export a selected installment plan to CSV format.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with export status message
+    """
     print("\n=== Export Plan to CSV ===\n")
 
     result = select_plan(context)
@@ -639,6 +669,12 @@ def select_plan(
 
 
 def edit_merchant_name(context: NavigationContext) -> CommandResult:
+    """
+    Edit the merchant name of the current plan.
+
+    :param context: Navigation context containing plan manager and edit plan ID
+    :return: CommandResult with update status message
+    """
     print("\n=== Edit Merchant Name ===\n")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
@@ -728,6 +764,12 @@ def _edit_installment_field(
 
 
 def edit_installment_amount(context: NavigationContext) -> CommandResult:
+    """
+    Edit the amount of a specific installment.
+
+    :param context: Navigation context containing plan manager and edit plan ID
+    :return: CommandResult with update status message
+    """
     def apply_amount_update(plan, installment, new_amount):
         plan.set_installment_amount(installment.installment_number, new_amount)
         return f"\nInstallment #{installment.installment_number} amount updated to {format_currency(new_amount)}"\
@@ -790,6 +832,12 @@ def _select_paid_installment(plan: InstallmentPlan) -> Installment | None:
 
 
 def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
+    """
+    Edit the paid date of an already-paid installment.
+
+    :param context: Navigation context containing plan manager and edit plan ID
+    :return: CommandResult with update status message
+    """
     def apply_paid_date_update(plan, installment, new_paid_date):
         plan.set_installment_paid_date(installment.installment_number, new_paid_date)
         return f"\nInstallment #{installment.installment_number} paid date updated to {new_paid_date}"
@@ -808,6 +856,12 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
 
 
 def delete_plan(context: NavigationContext) -> CommandResult:
+    """
+    Delete the current installment plan after confirmation.
+
+    :param context: Navigation context containing plan manager and edit plan ID
+    :return: CommandResult with deletion status and POP_TO_ROOT action
+    """
     print("\n=== Delete Plan ===\n")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
@@ -839,6 +893,12 @@ def delete_plan(context: NavigationContext) -> CommandResult:
 
 
 def edit_plan_menu(context: NavigationContext) -> CommandResult:
+    """
+    Display menu for editing a selected installment plan.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with PUSH action to edit submenu
+    """
     print("\n=== Edit Plan ===\n")
 
     result = select_plan(context, "Select plan to edit")
@@ -869,6 +929,12 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
 
 
 def save_and_exit(context: NavigationContext) -> CommandResult:
+    """
+    Save all plans and exit the application.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with EXIT action
+    """
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     saved_count, _ = _save_all_plans(plan_manager)
