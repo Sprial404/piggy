@@ -205,13 +205,13 @@ class InstallmentPlan(BaseModel):
         if numbers is None:
             return self.installments
 
-        lookup = {inst.installment_number: inst for inst in self.installments}
         result = []
+        num_installments = len(self.installments)
 
         for num in numbers:
-            if num not in lookup:
+            if num < 1 or num > num_installments:
                 raise ValueError(f"Installment #{num} does not exist.")
-            result.append(lookup[num])
+            result.append(self.installments[num - 1])
 
         return result
 
