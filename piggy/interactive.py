@@ -512,7 +512,7 @@ def _display_payment_overview(
         print()
 
     if categorized['future']:
-        future_total = sum(p.installment.amount for p in categorized['future'])
+        future_total = sum((p.installment.amount for p in categorized['future']), start=Decimal(0))
         print(f"Future Payments (Beyond {upcoming_days} Days)")
         print("-" * 50)
         print(f"  Count: {len(categorized['future'])}")
