@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Callable, Optional
 
+from piggy.utils.error_handler import get_error_category, format_error_for_category
+
 
 class NavigationAction(Enum):
     NONE = auto()
@@ -166,14 +168,29 @@ class Menu:
         if choice in self._commands:
             command = self._commands[choice]
 
-            # noinspection PyBroadException
             try:
                 return command.execute(context)
+            except KeyboardInterrupt:
+                # User cancelled - re-raise to let outer handler deal with it
+                raise
             except Exception as e:
-                return CommandResult(
-                    action=NavigationAction.NONE,
-                    message=f"An error occurred while executing the command: {e}"
-                )
+                # Categorize and format error appropriately
+                category = get_error_category(e)
+                error_message = format_error_for_category(e, category)
+
+                # Print traceback to console for unexpected errors
+                if category == 'unexpected':
+                    print(error_message)
+                    # Return simpler message for CommandResult
+                    return CommandResult(
+                        action=NavigationAction.NONE,
+                        message=f"An unexpected error occurred: {type(e).__name__}"
+                    )
+                else:
+                    return CommandResult(
+                        action=NavigationAction.NONE,
+                        message=error_message
+                    )
         else:
             return CommandResult(
                 action=NavigationAction.NONE,
