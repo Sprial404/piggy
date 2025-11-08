@@ -103,7 +103,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
 
     total_amount = get_decimal_input("Total amount")
     purchase_date = get_date_input("Purchase date", default=date.today())
-    num_installments = get_int_input("Number of installments", min_val=1)
+    num_installments = get_int_input("Number of installments", min_val=1, default=4)
 
     installment_amount = total_amount / num_installments
 
