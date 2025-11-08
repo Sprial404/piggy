@@ -343,13 +343,23 @@ class InstallmentPlan(BaseModel):
         )
 
     def to_json(self, file_path: str | None = None) -> str:
-        """Serialize the installment plan to JSON format"""
+        """
+        Serialize the installment plan to JSON format.
+
+        :param file_path: Optional file path to save JSON
+        :return: JSON string representation
+        :raises ValueError: If file_path is an existing directory
+        :raises OSError: If file write fails or parent directory cannot be created
+        """
+        from piggy.utils.helpers import ensure_directory
+
         json_data = self.model_dump(mode='json')
         json_str = json.dumps(json_data, indent=2, default=str)
-        
+
         if file_path:
-            Path(file_path).write_text(json_str, encoding='utf-8')
-        
+            validated_path = ensure_directory(file_path)
+            validated_path.write_text(json_str, encoding='utf-8')
+
         return json_str
 
     @classmethod
@@ -373,8 +383,14 @@ class InstallmentPlan(BaseModel):
 
         :param file_path: File path to save CSV
         :return: CSV content as string
+        :raises ValueError: If file_path is an existing directory
+        :raises OSError: If file write fails or parent directory cannot be created
         """
         from piggy.utils.csv_writer import write_csv_from_dicts, format_value
+        from piggy.utils.helpers import ensure_directory
+
+        # Validate path before processing
+        ensure_directory(file_path)
 
         headers = [
             'merchant_name', 'total_amount', 'purchase_date',
