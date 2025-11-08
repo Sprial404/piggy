@@ -249,8 +249,8 @@ def _display_installments(plan: InstallmentPlan) -> None:
     for inst in plan.installments:
         status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
         status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
-        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: {format_currency(inst.amount)}"
-              f"due {inst.due_date}{status_text}")
+        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: "
+              f"{format_currency(inst.amount)} due {inst.due_date}{status_text}")
 
 
 def select_installment(plan: InstallmentPlan) -> Installment | None:
