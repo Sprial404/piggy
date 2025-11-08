@@ -126,12 +126,17 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
             # Read and verify content
             content = Path(tmp_path).read_text()
             lines = content.strip().split('\n')
-            
-            # Check header and some key data
-            self.assertIn('Field,Value', lines[0])
+
+            # Check header matches flattened CSV format
+            expected_headers = 'merchant_name,total_amount,purchase_date,created_at,updated_at,installment_number,amount,due_date,status,paid_date,is_paid,is_pending,is_overdue'
+            self.assertEqual(lines[0], expected_headers)
+
+            # Verify key data appears in CSV
             self.assertIn('Tech Store', content)
             self.assertIn('1200.00', content)
-            self.assertIn('Installment Number,Amount,Due Date,Status,Paid Date', content)
+
+            # Should have header + 3 installment rows
+            self.assertEqual(len(lines), 4)
         finally:
             # Clean up
             Path(tmp_path).unlink(missing_ok=True)
