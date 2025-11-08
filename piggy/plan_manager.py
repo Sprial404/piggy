@@ -66,6 +66,16 @@ class PlanManager:
         """
         return len(self.plans) > 0
 
+    def get_plan_file_path(self, plan_id: str, extension: str) -> Path:
+        """
+        Get file path for a plan.
+
+        :param plan_id: Plan identifier
+        :param extension: File extension (e.g., 'json', 'csv')
+        :return: Path object for the plan file
+        """
+        return self.storage_dir / f"{plan_id}.{extension}"
+
     def save_all(self) -> tuple[int, list[str]]:
         """
         Save all plans to disk.
@@ -78,7 +88,7 @@ class PlanManager:
 
         for plan_id, plan in self.plans.items():
             try:
-                file_path = self.storage_dir / f"{plan_id}.json"
+                file_path = self.get_plan_file_path(plan_id, "json")
                 plan.to_json(str(file_path))
                 saved_count += 1
             except (OSError, IOError) as e:

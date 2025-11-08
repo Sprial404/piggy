@@ -589,7 +589,7 @@ def export_plan_csv(context: NavigationContext) -> CommandResult:
 
     plan_manager.storage_dir.mkdir(exist_ok=True)
 
-    csv_path = plan_manager.storage_dir / f"{plan_id}.csv"
+    csv_path = plan_manager.get_plan_file_path(plan_id, "csv")
     try:
         plan.to_csv(str(csv_path))
         return CommandResult(message=f"\nPlan exported to {csv_path}")
