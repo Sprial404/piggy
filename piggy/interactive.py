@@ -65,6 +65,20 @@ def print_heading(heading: str) -> None:
     print(f"\n=== {heading} ===\n")
 
 
+def pluralize(count: int, singular: str, plural: str | None = None) -> str:
+    """
+    Return the singular or plural form based on count.
+
+    :param count: The count to check
+    :param singular: Singular form of the word
+    :param plural: Plural form (defaults to singular + 's')
+    :return: Appropriate form based on count
+    """
+    if plural is None:
+        plural = singular + "s"
+    return singular if count == 1 else plural
+
+
 def format_currency(amount: Decimal) -> str:
     """
     Format a Decimal amount as currency.
@@ -275,10 +289,7 @@ def _format_marking_result(count: int, action: str) -> str:
     """
     if count == 0:
         return f"\nNo installments were marked as {action}."
-    elif count == 1:
-        return f"\n{count} installment marked as {action}!"
-    else:
-        return f"\n{count} installments marked as {action}!"
+    return f"\n{count} {pluralize(count, 'installment')} marked as {action}!"
 
 
 def mark_payment(context: NavigationContext) -> CommandResult:
@@ -411,7 +422,7 @@ def _display_payment_overview(
         print()
         for p in categorized['upcoming']:
             inst = p.installment
-            days_str = f"in {p.days_until_due} day" + ("s" if p.days_until_due > 1 else "")
+            days_str = f"in {p.days_until_due} {pluralize(p.days_until_due, 'day')}"
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
             print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_str})")
         print()
