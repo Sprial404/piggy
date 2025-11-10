@@ -396,14 +396,18 @@ def _calculate_payment_statistics(
     :return: PaymentStatistics with calculated values
     """
     total_plans = len(plans_dict)
-    total_remaining = sum((plan.remaining_balance for plan in plans_dict.values()), start=Decimal(0))
-    total_paid = sum(
-        (sum((inst.amount for inst in plan.installments if inst.status == PaymentStatus.PAID), start=Decimal(0))
-         for plan in plans_dict.values()),
-        start=Decimal(0)
-    )
-    fully_paid_count = sum(1 for plan in plans_dict.values() if plan.is_fully_paid)
 
+    total_remaining = Decimal(0)
+    total_paid = Decimal(0)
+    fully_paid_count = 0
+
+    for plan in plans_dict.values():
+        total_remaining += plan.remaining_balance
+        total_paid += sum((inst.amount for inst in plan.installments if inst.is_paid), start=Decimal(0))
+        if plan.is_fully_paid:
+            fully_paid_count += 1
+
+    # Calculate category totals from already-categorized data
     overdue_total = sum((p.installment.amount for p in categorized['overdue']), start=Decimal(0))
     due_today_total = sum((p.installment.amount for p in categorized['due_today']), start=Decimal(0))
     upcoming_total = sum((p.installment.amount for p in categorized['upcoming']), start=Decimal(0))
