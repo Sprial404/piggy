@@ -185,12 +185,14 @@ Plans are stored as JSON files in the data directory:
 
 ## License
 
-[To be added]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-[To be added]
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for a list of contributors to this project.
 
 ## Authors
 
-- Sprial404
+- Sprial404 - Original author and maintainer
