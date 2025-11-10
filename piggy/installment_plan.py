@@ -105,8 +105,8 @@ class InstallmentPlan(BaseModel):
             raise ValueError("Must have at least 1 installment")
 
         # Verify installment numbers are sequential from 1 to n
-        installment_numbers = sorted(inst.installment_number for inst in value)
-        expected_numbers = list(range(1, num_installments + 1))
+        installment_numbers = {inst.installment_number for inst in value}
+        expected_numbers = set(range(1, num_installments + 1))
         if installment_numbers != expected_numbers:
             raise ValueError(
                 f"Installment numbers must be sequential from 1 to {num_installments}"
