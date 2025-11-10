@@ -10,9 +10,11 @@ from pydantic import ValidationError
 
 from piggy.analytics import (
     CategorizedPayments,
+    PaymentInfo,
     PaymentStatistics,
     calculate_payment_statistics,
     categorize_unpaid_installments,
+    group_payments_by_date,
 )
 from piggy.installment_plan import Installment, InstallmentPlan, PaymentStatus
 from piggy.menu import Command, CommandResult, Menu, MenuInterface, NavigationAction, NavigationContext
@@ -359,6 +361,96 @@ def mark_payment(context: NavigationContext) -> CommandResult:
         return CommandResult(message=_format_marking_result(marked_count, "unpaid"))
 
 
+def format_payment_date_header(due_date: date, days_until_due: int | None = None) -> str:
+    """
+    Format the date header for a group of payments.
+
+    :param due_date: The due date to display
+    :param days_until_due: Optional days until due (for context display)
+    :return: Formatted date header string
+    """
+    return f"Due: {due_date}"
+
+
+def format_payment_item(payment: PaymentInfo, show_days_info: bool = True) -> str:
+    """
+    Format a single payment line within a date group.
+
+    :param payment: PaymentInfo object to format
+    :param show_days_info: Whether to show days overdue/until due
+    :return: Formatted payment string (multi-line)
+    """
+    inst = payment.installment
+    lines = [f"  {payment.merchant} - Installment #{inst.installment_number}"]
+
+    if show_days_info:
+        if payment.days_until_due < 0:
+            days_overdue = abs(payment.days_until_due)
+            lines.append(f"    {format_currency(inst.amount)} ({days_overdue} days overdue)")
+        elif payment.days_until_due > 0:
+            days_str = f"in {payment.days_until_due} {pluralize(payment.days_until_due, 'day')}"
+            lines.append(f"    {format_currency(inst.amount)} ({days_str})")
+        else:
+            lines.append(f"    {format_currency(inst.amount)}")
+    else:
+        lines.append(f"    {format_currency(inst.amount)}")
+
+    return "\n".join(lines)
+
+
+def format_daily_subtotal(total: Decimal, indent: str = "    ") -> str:
+    """
+    Format the daily subtotal line.
+
+    :param total: Total amount for the day
+    :param indent: Indentation string
+    :return: Formatted subtotal string (multi-line)
+    """
+    separator = "─" * 17
+    return f"{indent}{separator}\n{indent}Daily Total: {format_currency(total)}"
+
+
+def display_grouped_payments(
+    payments_by_date: dict[date, list[PaymentInfo]],
+    section_emoji: str,
+    section_title: str,
+    show_days_info: bool = True,
+) -> None:
+    """
+    Display a section of payments grouped by date with subtotals.
+
+    :param payments_by_date: Dictionary mapping date -> list of payments
+    :param section_emoji: Emoji to display in section header
+    :param section_title: Title text for the section
+    :param show_days_info: Whether to show days overdue/until due information
+    """
+    total_payments = sum(len(payments) for payments in payments_by_date.values())
+    print(f"{section_emoji} {section_title} ({total_payments})")
+    print("-" * 50)
+
+    for due_date, payments in payments_by_date.items():
+        # Show date header if there are multiple dates or multiple payments on this date
+        if len(payments_by_date) > 1 or len(payments) > 1:
+            print(format_payment_date_header(due_date))
+
+        # Display each payment
+        for payment in payments:
+            print(format_payment_item(payment, show_days_info))
+
+        # Show daily subtotal if multiple payments on same day
+        if len(payments) > 1:
+            daily_total = sum((p.installment.amount for p in payments), start=Decimal(0))
+            print(format_daily_subtotal(daily_total))
+
+        # Add spacing between dates
+        if len(payments_by_date) > 1:
+            print()
+
+    # Final newline if we didn't already add spacing
+    if len(payments_by_date) == 1:
+        print()
+
+
 def _display_payment_overview(stats: PaymentStatistics, categorized: CategorizedPayments, upcoming_days: int) -> None:
     """
     Display payment overview information.
@@ -384,23 +476,12 @@ def _display_payment_overview(stats: PaymentStatistics, categorized: Categorized
     print()
 
     if categorized["overdue"]:
-        print(f"⚠️  OVERDUE PAYMENTS ({len(categorized['overdue'])})")
-        print("-" * 50)
-        for p in categorized["overdue"]:
-            inst = p.installment
-            days_overdue = abs(p.days_until_due)
-            print(f"  {p.merchant} - Installment #{inst.installment_number}")
-            print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_overdue} days overdue)")
-        print()
+        payments_by_date = group_payments_by_date(categorized["overdue"])
+        display_grouped_payments(payments_by_date, "⚠️", "OVERDUE PAYMENTS", show_days_info=True)
 
     if categorized["due_today"]:
-        print(f"🔔 DUE TODAY ({len(categorized['due_today'])})")
-        print("-" * 50)
-        for p in categorized["due_today"]:
-            inst = p.installment
-            print(f"  {p.merchant} - Installment #{inst.installment_number}")
-            print(f"    {format_currency(inst.amount)} - Due: {inst.due_date}")
-        print()
+        payments_by_date = group_payments_by_date(categorized["due_today"])
+        display_grouped_payments(payments_by_date, "🔔", "DUE TODAY", show_days_info=False)
 
     if categorized["upcoming"]:
         upcoming_total = sum((p.installment.amount for p in categorized["upcoming"]), start=Decimal(0))
@@ -409,12 +490,28 @@ def _display_payment_overview(stats: PaymentStatistics, categorized: Categorized
         print(f"  Count: {len(categorized['upcoming'])}")
         print(f"  Total: {format_currency(upcoming_total)}")
         print()
-        for p in categorized["upcoming"]:
-            inst = p.installment
-            days_str = f"in {p.days_until_due} {pluralize(p.days_until_due, 'day')}"
-            print(f"  {p.merchant} - Installment #{inst.installment_number}")
-            print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_str})")
-        print()
+        payments_by_date = group_payments_by_date(categorized["upcoming"])
+        for due_date, payments in payments_by_date.items():
+            # Show date header if there are multiple dates or multiple payments on this date
+            if len(payments_by_date) > 1 or len(payments) > 1:
+                print(format_payment_date_header(due_date))
+
+            # Display each payment
+            for payment in payments:
+                print(format_payment_item(payment, show_days_info=True))
+
+            # Show daily subtotal if multiple payments on same day
+            if len(payments) > 1:
+                daily_total = sum((p.installment.amount for p in payments), start=Decimal(0))
+                print(format_daily_subtotal(daily_total))
+
+            # Add spacing between dates
+            if len(payments_by_date) > 1:
+                print()
+
+        # Final newline if we didn't already add spacing
+        if len(payments_by_date) == 1:
+            print()
 
     if categorized["future"]:
         future_total = sum((p.installment.amount for p in categorized["future"]), start=Decimal(0))

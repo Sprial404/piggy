@@ -47,6 +47,23 @@ class PaymentStatistics(TypedDict):
     time_period_totals: dict[int, Decimal]
 
 
+def group_payments_by_date(payments: list[PaymentInfo]) -> dict[date, list[PaymentInfo]]:
+    """
+    Group payments by their due date.
+
+    :param payments: List of PaymentInfo objects to group
+    :return: Dictionary mapping due_date -> list of PaymentInfo for that date
+    """
+    grouped: dict[date, list[PaymentInfo]] = {}
+    for payment in payments:
+        due_date = payment.installment.due_date
+        if due_date not in grouped:
+            grouped[due_date] = []
+        grouped[due_date].append(payment)
+
+    return dict(sorted(grouped.items()))
+
+
 def categorize_unpaid_installments(
     plans_dict: dict[str, InstallmentPlan], today: date, upcoming_days: int
 ) -> CategorizedPayments:
