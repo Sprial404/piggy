@@ -124,7 +124,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
             days_between = PaymentFrequency.WEEKLY
         case "4":
             days_between = get_int_input("Days between payments", min_val=1)
-            if not days_between:
+            if days_between is None:
                 return CommandResult(message="Valid days between payments is required.")
         case _:
             return CommandResult(message="Invalid frequency choice.")
@@ -133,8 +133,6 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
         "First payment date",
         default=purchase_date + timedelta(days=days_between)
     )
-    if not first_payment_date:
-        return CommandResult(message="First payment date is required.")
 
     try:
         plan = InstallmentPlan.build(
@@ -563,7 +561,7 @@ def select_plan(
         print(f"{idx}. {plan_id} - {format_currency(plan.total_amount)} ({plan.merchant_name})")
 
     choice = get_int_input(f"\n{prompt}", min_val=1, max_val=len(plan_items))
-    if not choice:
+    if choice is None:
         return None
 
     plan_id, _ = plan_items[choice - 1]
