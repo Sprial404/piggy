@@ -172,7 +172,7 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager
     :return: CommandResult with continuation message
     """
-    print("\n=== View Plan Details ===\n")
+    print_heading("View Plan Details")
 
     result = select_plan(context)
     if not result:
@@ -282,7 +282,7 @@ def _format_marking_result(count: int, action: str) -> str:
 
 
 def mark_payment(context: NavigationContext) -> CommandResult:
-    print("\n=== Mark Payment ===\n")
+    print_heading("Mark Payment")
 
     result = select_plan(context)
     if not result:
@@ -426,7 +426,7 @@ def _display_payment_overview(
 
 
 def overview(context: NavigationContext) -> CommandResult:
-    print("\n=== Overview ===\n")
+    print_heading("Overview")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     if not plan_manager.has_plans():
@@ -471,7 +471,7 @@ def save_plans(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager
     :return: CommandResult with save status message
     """
-    print("\n=== Save Plans ===\n")
+    print_heading("Save Plans")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     saved_count, _ = _save_all_plans(plan_manager)
@@ -491,7 +491,7 @@ def load_plans(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager
     :return: CommandResult with load status message
     """
-    print("\n=== Load Plans ===\n")
+    print_heading("Load Plans")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     loaded_count, errors = plan_manager.load_all()
@@ -514,7 +514,7 @@ def export_plan_csv(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager
     :return: CommandResult with export status message
     """
-    print("\n=== Export Plan to CSV ===\n")
+    print_heading("Export Plan to CSV")
 
     result = select_plan(context)
     if not result:
@@ -565,7 +565,7 @@ def edit_merchant_name(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager and edit plan ID
     :return: CommandResult with update status message
     """
-    print("\n=== Edit Merchant Name ===\n")
+    print_heading("Edit Merchant Name")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     plan_id = context.get_data(ContextKeys.EDIT_PLAN_ID)
@@ -752,7 +752,7 @@ def delete_plan(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager and edit plan ID
     :return: CommandResult with deletion status and POP_TO_ROOT action
     """
-    print("\n=== Delete Plan ===\n")
+    print_heading("Delete Plan")
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     plan_id = context.get_data(ContextKeys.EDIT_PLAN_ID)
@@ -789,7 +789,7 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager
     :return: CommandResult with PUSH action to edit submenu
     """
-    print("\n=== Edit Plan ===\n")
+    print_heading("Edit Plan")
 
     result = select_plan(context, "Select plan to edit")
     if not result:
