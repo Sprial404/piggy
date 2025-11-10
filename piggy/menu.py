@@ -82,6 +82,7 @@ class CommandResult:
     target_menu: Optional['Menu'] = None
     message: str | None = None
     return_value: Any | None = None
+    wait_for_key: bool = False
 
 
 class BaseCommand(ABC):
@@ -239,6 +240,9 @@ class MenuInterface:
 
             if result.message:
                 print(f"\n{result.message}")
+
+            if result.wait_for_key:
+                input("Press Enter to continue...")
 
             match result.action:
                 case NavigationAction.EXIT:

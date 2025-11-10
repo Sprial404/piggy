@@ -190,7 +190,7 @@ def list_installment_plans(context: NavigationContext) -> CommandResult:
         print(f"  Next due: {plan.next_payment_due or 'N/A'}")
         print(f"  Status: {'Fully Paid' if plan.is_fully_paid else 'Active'}")
 
-    return CommandResult(message="\nPress Enter to continue...")
+    return CommandResult(wait_for_key=True)
 
 
 def view_plan_details(context: NavigationContext) -> CommandResult:
@@ -220,7 +220,7 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
         if inst.paid_date:
             print(f"     Paid on: {inst.paid_date}")
 
-    return CommandResult(message="\nPress Enter to continue...")
+    return CommandResult(wait_for_key=True)
 
 
 def format_installment_line(
@@ -563,7 +563,7 @@ def overview(context: NavigationContext) -> CommandResult:
     stats = _calculate_payment_statistics(plans_dict, categorized, time_periods)
     _display_payment_overview(stats, categorized, upcoming_days)
 
-    return CommandResult(message="Press Enter to continue...")
+    return CommandResult(wait_for_key=True)
 
 
 def _save_all_plans(plan_manager: PlanManager) -> tuple[int, list[str]]:
