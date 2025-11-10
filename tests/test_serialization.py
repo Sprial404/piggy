@@ -5,11 +5,13 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from piggy.installment_plan import InstallmentPlan, Installment, PaymentStatus
+from pydantic import ValidationError
+
+from piggy.installment_plan import Installment, InstallmentPlan, PaymentStatus
 
 
 class TestInstallmentPlanSerialization(unittest.TestCase):
-    
+
     def setUp(self):
         """Set up test data"""
         self.sample_plan = InstallmentPlan(
@@ -22,51 +24,51 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
                     amount=Decimal("400.00"),
                     due_date=date(2024, 2, 15),
                     status=PaymentStatus.PAID,
-                    paid_date=date(2024, 2, 10)
+                    paid_date=date(2024, 2, 10),
                 ),
                 Installment(
                     installment_number=2,
                     amount=Decimal("400.00"),
                     due_date=date(2024, 3, 15),
-                    status=PaymentStatus.PENDING
+                    status=PaymentStatus.PENDING,
                 ),
                 Installment(
                     installment_number=3,
                     amount=Decimal("400.00"),
                     due_date=date(2024, 4, 15),
-                    status=PaymentStatus.PENDING
-                )
-            ]
+                    status=PaymentStatus.PENDING,
+                ),
+            ],
         )
 
     def test_json_serialization_to_string(self):
         """Test JSON serialization to string"""
         json_str = self.sample_plan.to_json()
-        
+
         # Verify it's valid JSON
         parsed = json.loads(json_str)
         self.assertIsInstance(parsed, dict)
-        self.assertEqual(parsed['merchant_name'], "Tech Store")
-        self.assertEqual(parsed['total_amount'], "1200.00")
-        self.assertEqual(len(parsed['installments']), 3)
+        self.assertEqual(parsed["merchant_name"], "Tech Store")
+        self.assertEqual(parsed["total_amount"], "1200.00")
+        self.assertEqual(len(parsed["installments"]), 3)
 
     def test_json_serialization_to_file(self):
         """Test JSON serialization to file"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp_file:
             tmp_path = tmp_file.name
-        
+
         try:
             # Serialize to file
             result = self.sample_plan.to_json(tmp_path)
-            
+
             # Verify file was created and contains valid JSON
             self.assertTrue(Path(tmp_path).exists())
             file_content = Path(tmp_path).read_text()
             self.assertEqual(result, file_content)
-            
+
             # Verify content is valid JSON
             parsed = json.loads(file_content)
-            self.assertEqual(parsed['merchant_name'], "Tech Store")
+            self.assertEqual(parsed["merchant_name"], "Tech Store")
         finally:
             # Clean up
             Path(tmp_path).unlink(missing_ok=True)
@@ -75,13 +77,13 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
         """Test JSON deserialization from string"""
         json_str = self.sample_plan.to_json()
         restored_plan = InstallmentPlan.from_json(json_str)
-        
+
         # Verify all data is preserved
         self.assertEqual(restored_plan.merchant_name, self.sample_plan.merchant_name)
         self.assertEqual(restored_plan.total_amount, self.sample_plan.total_amount)
         self.assertEqual(restored_plan.purchase_date, self.sample_plan.purchase_date)
         self.assertEqual(len(restored_plan.installments), len(self.sample_plan.installments))
-        
+
         # Check first installment details
         original_inst = self.sample_plan.installments[0]
         restored_inst = restored_plan.installments[0]
@@ -93,16 +95,16 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
 
     def test_json_deserialization_from_file(self):
         """Test JSON deserialization from file"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp_file:
             tmp_path = tmp_file.name
-        
+
         try:
             # Save to file
             self.sample_plan.to_json(tmp_path)
-            
+
             # Load from file
             restored_plan = InstallmentPlan.from_json_file(tmp_path)
-            
+
             # Verify data integrity
             self.assertEqual(restored_plan.merchant_name, self.sample_plan.merchant_name)
             self.assertEqual(restored_plan.total_amount, self.sample_plan.total_amount)
@@ -113,27 +115,27 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
 
     def test_csv_export(self):
         """Test CSV export functionality"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp_file:
             tmp_path = tmp_file.name
-        
+
         try:
             # Export to CSV
             self.sample_plan.to_csv(tmp_path)
-            
+
             # Verify file was created
             self.assertTrue(Path(tmp_path).exists())
-            
+
             # Read and verify content
             content = Path(tmp_path).read_text()
-            lines = content.strip().split('\n')
+            lines = content.strip().split("\n")
 
             # Check header matches flattened CSV format
-            expected_headers = 'merchant_name,total_amount,purchase_date,created_at,updated_at,installment_number,amount,due_date,status,paid_date,is_paid,is_pending,is_overdue'
+            expected_headers = "merchant_name,total_amount,purchase_date,created_at,updated_at,installment_number,amount,due_date,status,paid_date,is_paid,is_pending,is_overdue"
             self.assertEqual(lines[0], expected_headers)
 
             # Verify key data appears in CSV
-            self.assertIn('Tech Store', content)
-            self.assertIn('1200.00', content)
+            self.assertIn("Tech Store", content)
+            self.assertIn("1200.00", content)
 
             # Should have header + 3 installment rows
             self.assertEqual(len(lines), 4)
@@ -146,7 +148,7 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
         # Serialize and deserialize
         json_str = self.sample_plan.to_json()
         restored_plan = InstallmentPlan.from_json(json_str)
-        
+
         # Check calculated properties are preserved
         self.assertEqual(restored_plan.remaining_balance, self.sample_plan.remaining_balance)
         self.assertEqual(restored_plan.is_fully_paid, self.sample_plan.is_fully_paid)
@@ -164,12 +166,14 @@ class TestInstallmentPlanValidation(unittest.TestCase):
 
     def test_missing_required_fields(self):
         """Test deserialization with missing required fields"""
-        invalid_json = json.dumps({
-            "merchant_name": "Test",
-            # Missing total_amount, purchase_date, installments
-        })
+        invalid_json = json.dumps(
+            {
+                "merchant_name": "Test",
+                # Missing total_amount, purchase_date, installments
+            }
+        )
 
-        with self.assertRaises(Exception):  # Pydantic ValidationError
+        with self.assertRaises(ValidationError):
             InstallmentPlan.from_json(invalid_json)
 
     def test_negative_total_amount(self):
@@ -181,13 +185,7 @@ class TestInstallmentPlanValidation(unittest.TestCase):
                 merchant_name="Test",
                 total_amount=Decimal("-100.00"),
                 purchase_date=date(2024, 1, 1),
-                installments=[
-                    Installment(
-                        installment_number=1,
-                        amount=Decimal("-100.00"),
-                        due_date=date(2024, 2, 1)
-                    )
-                ]
+                installments=[Installment(installment_number=1, amount=Decimal("-100.00"), due_date=date(2024, 2, 1))],
             )
 
     def test_zero_total_amount(self):
@@ -196,10 +194,7 @@ class TestInstallmentPlanValidation(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             InstallmentPlan(
-                merchant_name="Test",
-                total_amount=Decimal("0"),
-                purchase_date=date(2024, 1, 1),
-                installments=[]
+                merchant_name="Test", total_amount=Decimal("0"), purchase_date=date(2024, 1, 1), installments=[]
             )
 
     def test_empty_installments_list(self):
@@ -208,10 +203,7 @@ class TestInstallmentPlanValidation(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             InstallmentPlan(
-                merchant_name="Test",
-                total_amount=Decimal("100.00"),
-                purchase_date=date(2024, 1, 1),
-                installments=[]
+                merchant_name="Test", total_amount=Decimal("100.00"), purchase_date=date(2024, 1, 1), installments=[]
             )
 
     def test_installment_total_mismatch(self):
@@ -224,17 +216,9 @@ class TestInstallmentPlanValidation(unittest.TestCase):
                 total_amount=Decimal("1000.00"),
                 purchase_date=date(2024, 1, 1),
                 installments=[
-                    Installment(
-                        installment_number=1,
-                        amount=Decimal("300.00"),
-                        due_date=date(2024, 2, 1)
-                    ),
-                    Installment(
-                        installment_number=2,
-                        amount=Decimal("300.00"),
-                        due_date=date(2024, 3, 1)
-                    )
-                ]
+                    Installment(installment_number=1, amount=Decimal("300.00"), due_date=date(2024, 2, 1)),
+                    Installment(installment_number=2, amount=Decimal("300.00"), due_date=date(2024, 3, 1)),
+                ],
             )
 
         self.assertIn("must equal total_amount", str(context.exception))
@@ -249,17 +233,9 @@ class TestInstallmentPlanValidation(unittest.TestCase):
                 total_amount=Decimal("600.00"),
                 purchase_date=date(2024, 1, 1),
                 installments=[
-                    Installment(
-                        installment_number=1,
-                        amount=Decimal("300.00"),
-                        due_date=date(2024, 2, 1)
-                    ),
-                    Installment(
-                        installment_number=3,  # Skip 2
-                        amount=Decimal("300.00"),
-                        due_date=date(2024, 3, 1)
-                    )
-                ]
+                    Installment(installment_number=1, amount=Decimal("300.00"), due_date=date(2024, 2, 1)),
+                    Installment(installment_number=3, amount=Decimal("300.00"), due_date=date(2024, 3, 1)),  # Skip 2
+                ],
             )
 
         self.assertIn("sequential", str(context.exception))
@@ -274,7 +250,7 @@ class TestInstallmentPlanValidation(unittest.TestCase):
                 amount=Decimal("100.00"),
                 due_date=date(2024, 2, 1),
                 status=PaymentStatus.PENDING,
-                paid_date=date(2024, 1, 31)  # Should fail
+                paid_date=date(2024, 1, 31),  # Should fail
             )
 
         self.assertIn("paid_date can only be set when status is PAID", str(context.exception))
@@ -289,11 +265,7 @@ class TestInstallmentPlanValidation(unittest.TestCase):
         from pydantic import ValidationError
 
         with self.assertRaises(ValidationError):
-            Installment(
-                installment_number=1,
-                amount=Decimal("-50.00"),
-                due_date=date(2024, 2, 1)
-            )
+            Installment(installment_number=1, amount=Decimal("-50.00"), due_date=date(2024, 2, 1))
 
 
 class TestInstallmentPlanComputedProperties(unittest.TestCase):
@@ -311,21 +283,21 @@ class TestInstallmentPlanComputedProperties(unittest.TestCase):
                     amount=Decimal("400.00"),
                     due_date=date(2024, 1, 15),
                     status=PaymentStatus.PAID,
-                    paid_date=date(2024, 1, 14)
+                    paid_date=date(2024, 1, 14),
                 ),
                 Installment(
                     installment_number=2,
                     amount=Decimal("400.00"),
                     due_date=date(2024, 2, 15),
-                    status=PaymentStatus.PENDING
+                    status=PaymentStatus.PENDING,
                 ),
                 Installment(
                     installment_number=3,
                     amount=Decimal("400.00"),
                     due_date=date(2024, 3, 15),
-                    status=PaymentStatus.OVERDUE
-                )
-            ]
+                    status=PaymentStatus.OVERDUE,
+                ),
+            ],
         )
 
     def test_remaining_balance(self):
@@ -435,21 +407,21 @@ class TestInstallmentPlanComputedProperties(unittest.TestCase):
                     installment_number=1,
                     amount=Decimal("200.00"),
                     due_date=date(2024, 1, 15),
-                    status=PaymentStatus.PENDING
+                    status=PaymentStatus.PENDING,
                 ),
                 Installment(
                     installment_number=2,
                     amount=Decimal("200.00"),
                     due_date=date(2024, 2, 15),
-                    status=PaymentStatus.PENDING
+                    status=PaymentStatus.PENDING,
                 ),
                 Installment(
                     installment_number=3,
                     amount=Decimal("200.00"),
                     due_date=date(2024, 3, 15),
-                    status=PaymentStatus.PENDING
-                )
-            ]
+                    status=PaymentStatus.PENDING,
+                ),
+            ],
         )
 
         # Update as of March 1st - first two should be overdue
@@ -471,17 +443,9 @@ class TestInstallmentPlanSetters(unittest.TestCase):
             total_amount=Decimal("600.00"),
             purchase_date=date(2024, 1, 1),
             installments=[
-                Installment(
-                    installment_number=1,
-                    amount=Decimal("300.00"),
-                    due_date=date(2024, 2, 1)
-                ),
-                Installment(
-                    installment_number=2,
-                    amount=Decimal("300.00"),
-                    due_date=date(2024, 3, 1)
-                )
-            ]
+                Installment(installment_number=1, amount=Decimal("300.00"), due_date=date(2024, 2, 1)),
+                Installment(installment_number=2, amount=Decimal("300.00"), due_date=date(2024, 3, 1)),
+            ],
         )
 
     def test_mark_installment_paid(self):
@@ -574,5 +538,5 @@ class TestInstallmentPlanSetters(unittest.TestCase):
         self.assertIn("greater than zero", str(context.exception))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

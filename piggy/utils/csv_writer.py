@@ -17,24 +17,16 @@ def format_value(value: Any) -> str:
     :param value: Value to format
     :return: Formatted string representation
     """
-    if isinstance(value, datetime):
+    if isinstance(value, datetime | date):
         return value.isoformat()
-    elif isinstance(value, date):
-        return value.isoformat()
-    elif isinstance(value, Decimal):
-        return str(value)
-    elif isinstance(value, bool):
+    elif isinstance(value, Decimal | bool):
         return str(value)
     elif value is None:
-        return ''
+        return ""
     return str(value)
 
 
-def write_csv_from_dicts(
-    headers: list[str],
-    rows: list[dict[str, Any]],
-    file_path: str | None = None
-) -> str:
+def write_csv_from_dicts(headers: list[str], rows: list[dict[str, Any]], file_path: str | None = None) -> str:
     """
     Write CSV from list of dictionaries.
 
@@ -51,6 +43,6 @@ def write_csv_from_dicts(
     csv_content = output.getvalue()
 
     if file_path:
-        Path(file_path).write_text(csv_content, encoding='utf-8')
+        Path(file_path).write_text(csv_content, encoding="utf-8")
 
     return csv_content

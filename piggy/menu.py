@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
-from piggy.utils.error_handler import get_error_category, format_error_for_category
+from piggy.utils.error_handler import format_error_for_category, get_error_category
 
 
 class NavigationAction(Enum):
@@ -17,14 +18,14 @@ class NavigationAction(Enum):
 
 class NavigationContext:
     def __init__(self):
-        self._menu_stack: list['Menu'] = []
+        self._menu_stack: list[Menu] = []
         self._shared_data: dict[str, Any] = {}
-        self._last_result: Optional['CommandResult'] = None
+        self._last_result: CommandResult | None = None
 
-    def push_menu(self, menu: 'Menu'):
+    def push_menu(self, menu: "Menu"):
         self._menu_stack.append(menu)
 
-    def pop_menu(self) -> Optional['Menu']:
+    def pop_menu(self) -> Optional["Menu"]:
         if len(self._menu_stack) > 1:
             self._menu_stack.pop()
             return self.get_current_menu()
@@ -34,13 +35,13 @@ class NavigationContext:
         if self._menu_stack:
             self._menu_stack = [self._menu_stack[0]]
 
-    def replace_menu(self, menu: 'Menu'):
+    def replace_menu(self, menu: "Menu"):
         if self._menu_stack:
             self._menu_stack[-1] = menu
         else:
             self._menu_stack.append(menu)
 
-    def get_current_menu(self) -> Optional['Menu']:
+    def get_current_menu(self) -> Optional["Menu"]:
         return self._menu_stack[-1] if self._menu_stack else None
 
     def get_breadcrumb(self) -> str:
@@ -61,7 +62,7 @@ class NavigationContext:
         else:
             self._shared_data.clear()
 
-    def set_last_result(self, result: 'CommandResult'):
+    def set_last_result(self, result: "CommandResult"):
         """Store the last command result for access by parent menus."""
         self._last_result = result
 
@@ -79,7 +80,7 @@ class NavigationContext:
 @dataclass
 class CommandResult:
     action: NavigationAction = NavigationAction.NONE
-    target_menu: Optional['Menu'] = None
+    target_menu: Optional["Menu"] = None
     message: str | None = None
     return_value: Any | None = None
     wait_for_key: bool = False
@@ -126,7 +127,7 @@ class ExitCommand(BaseCommand):
 
 
 class SubMenuCommand(BaseCommand):
-    def __init__(self, menu: 'Menu'):
+    def __init__(self, menu: "Menu"):
         self._menu = menu
 
     def execute(self, context: NavigationContext) -> CommandResult:
@@ -161,7 +162,7 @@ class Menu:
             raise KeyError(f'Command "{key}" already exists')
         self._commands[key] = command
 
-    def add_submenu(self, key: str, submenu: 'Menu'):
+    def add_submenu(self, key: str, submenu: "Menu"):
         self.add_command(key, SubMenuCommand(submenu))
 
     def add_back_command(self, key: str = "b"):
@@ -189,31 +190,20 @@ class Menu:
                 error_message = format_error_for_category(e, category)
 
                 # Print traceback to console for unexpected errors
-                if category == 'unexpected':
+                if category == "unexpected":
                     print(error_message)
                     # Return simpler message for CommandResult
                     return CommandResult(
-                        action=NavigationAction.NONE,
-                        message=f"An unexpected error occurred: {type(e).__name__}"
+                        action=NavigationAction.NONE, message=f"An unexpected error occurred: {type(e).__name__}"
                     )
                 else:
-                    return CommandResult(
-                        action=NavigationAction.NONE,
-                        message=error_message
-                    )
+                    return CommandResult(action=NavigationAction.NONE, message=error_message)
         else:
-            return CommandResult(
-                action=NavigationAction.NONE,
-                message=f"Command '{choice}' not found."
-            )
+            return CommandResult(action=NavigationAction.NONE, message=f"Command '{choice}' not found.")
 
 
 class MenuInterface:
-    def __init__(
-        self,
-        start_menu: Menu,
-        context: NavigationContext | None = None
-    ):
+    def __init__(self, start_menu: Menu, context: NavigationContext | None = None):
         self._context = context if context is not None else NavigationContext()
         self._context.push_menu(start_menu)
 

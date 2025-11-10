@@ -27,7 +27,7 @@ def ensure_directory(file_path: str | Path) -> Path:
     if path.exists() and path.is_dir():
         raise ValueError(f"Path is a directory, not a file: {file_path}")
 
-    if path.parent != Path('.'):
+    if path.parent != Path("."):
         path.parent.mkdir(parents=True, exist_ok=True)
 
     return path

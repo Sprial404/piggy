@@ -24,7 +24,7 @@ def format_error_message(exception: Exception, include_traceback: bool = False) 
             "=" * 50,
             tb_string.rstrip(),
             "=" * 50,
-            ""
+            "",
         ]
         return "\n".join(lines)
     else:
@@ -39,14 +39,14 @@ def get_error_category(exception: Exception) -> str:
     :param exception: The exception to categorize
     :return: Category string: 'expected', 'io', 'interrupt', or 'unexpected'
     """
-    if isinstance(exception, (ValueError, KeyError, FileNotFoundError)):
-        return 'expected'
-    elif isinstance(exception, (OSError, IOError)):
-        return 'io'
+    if isinstance(exception, ValueError | KeyError | FileNotFoundError):
+        return "expected"
+    elif isinstance(exception, OSError | IOError):
+        return "io"
     elif isinstance(exception, KeyboardInterrupt):
-        return 'interrupt'
+        return "interrupt"
     else:
-        return 'unexpected'
+        return "unexpected"
 
 
 def format_error_for_category(exception: Exception, category: str) -> str:
@@ -57,11 +57,11 @@ def format_error_for_category(exception: Exception, category: str) -> str:
     :param category: Error category from get_error_category()
     :return: Formatted error message
     """
-    if category == 'expected':
+    if category == "expected":
         return f"Error: {exception}"
-    elif category == 'io':
+    elif category == "io":
         return f"File operation failed: {exception}"
-    elif category == 'unexpected':
+    elif category == "unexpected":
         return format_error_message(exception, include_traceback=True)
     else:
         return str(exception)

@@ -1,30 +1,29 @@
 import os
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import ValidationError
 
 from piggy.analytics import (
-    CategorizedPayments, PaymentStatistics,
-    categorize_unpaid_installments, calculate_payment_statistics
+    CategorizedPayments,
+    PaymentStatistics,
+    calculate_payment_statistics,
+    categorize_unpaid_installments,
 )
-from piggy.installment_plan import InstallmentPlan, PaymentStatus, Installment
-from piggy.menu import (
-    MenuInterface, NavigationContext, Menu, Command, CommandResult,
-    NavigationAction
-)
+from piggy.installment_plan import Installment, InstallmentPlan, PaymentStatus
+from piggy.menu import Command, CommandResult, Menu, MenuInterface, NavigationAction, NavigationContext
 from piggy.plan_manager import PlanManager
 from piggy.utils import get_project_root
-from piggy.utils.input import (
-    get_input, get_decimal_input, get_date_input, get_int_input
-)
+from piggy.utils.input import get_date_input, get_decimal_input, get_input, get_int_input
 
 
 class PaymentFrequency(IntEnum):
     """Common payment frequencies in days."""
+
     MONTHLY = 30
     FORTNIGHTLY = 14
     WEEKLY = 7
@@ -32,6 +31,7 @@ class PaymentFrequency(IntEnum):
 
 class ContextKeys:
     """Constants for NavigationContext data keys."""
+
     PLAN_MANAGER = "plan_manager"
     EDIT_PLAN_ID = "edit_plan_id"
 
@@ -129,10 +129,7 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
         case _:
             return CommandResult(message="Invalid frequency choice.")
 
-    first_payment_date = get_date_input(
-        "First payment date",
-        default=purchase_date + timedelta(days=days_between)
-    )
+    first_payment_date = get_date_input("First payment date", default=purchase_date + timedelta(days=days_between))
 
     try:
         plan = InstallmentPlan.build(
@@ -141,15 +138,13 @@ def create_installment_plan(context: NavigationContext) -> CommandResult:
             purchase_date=purchase_date,
             num_installments=num_installments,
             days_between=days_between,
-            first_payment_date=first_payment_date
+            first_payment_date=first_payment_date,
         )
 
         plan_id = generate_plan_id(merchant_name, purchase_date, plan_manager)
         plan_manager.add_plan(plan_id, plan)
 
-        return CommandResult(
-            message=f"\nInstallment plan created successfully!\nPlan ID: {plan_id}"
-        )
+        return CommandResult(message=f"\nInstallment plan created successfully!\nPlan ID: {plan_id}")
     except (ValueError, ValidationError) as e:
         return CommandResult(message=f"Error creating plan: {e}")
 
@@ -199,7 +194,7 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     print(f"Purchase Date: {plan.purchase_date}")
     print(f"Remaining Balance: {format_currency(plan.remaining_balance)}")
     print(f"Next Payment Due: {plan.next_payment_due or 'N/A'}")
-    print(f"\nInstallments:")
+    print("\nInstallments:")
 
     for inst in plan.installments:
         print(format_installment_line(inst, show_status=True))
@@ -210,10 +205,7 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
 
 
 def format_installment_line(
-    inst: Installment,
-    show_status: bool = False,
-    show_paid_date_inline: bool = False,
-    indent: str = "  "
+    inst: Installment, show_status: bool = False, show_paid_date_inline: bool = False, indent: str = "  "
 ) -> str:
     """
     Format an installment as a display line.
@@ -246,8 +238,10 @@ def _display_installments(plan: InstallmentPlan) -> None:
     for inst in plan.installments:
         status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
         status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
-        print(f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: "
-              f"{format_currency(inst.amount)} due {inst.due_date}{status_text}")
+        print(
+            f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: "
+            f"{format_currency(inst.amount)} due {inst.due_date}{status_text}"
+        )
 
 
 def select_installment(plan: InstallmentPlan) -> Installment | None:
@@ -276,7 +270,7 @@ def _parse_installment_numbers(input_str: str) -> list[int]:
     :return: List of installment numbers
     :raises ValueError: If input contains invalid numbers
     """
-    return [int(num.strip()) for num in input_str.split(',')]
+    return [int(num.strip()) for num in input_str.split(",")]
 
 
 def _format_marking_result(count: int, action: str) -> str:
@@ -309,7 +303,7 @@ def mark_payment(context: NavigationContext) -> CommandResult:
     if action not in ["1", "2"]:
         return CommandResult(message="Invalid action selected.")
 
-    mark_as_paid = (action == "1")
+    mark_as_paid = action == "1"
 
     print("\nYou can select multiple installments (e.g., '1,2,3' or just '1')")
     if mark_as_paid:
@@ -340,8 +334,7 @@ def mark_payment(context: NavigationContext) -> CommandResult:
     if mark_as_paid:
         for selected_inst in selected_installments:
             paid_date = get_date_input(
-                f"Payment date for installment #{selected_inst.installment_number}",
-                default=selected_inst.due_date
+                f"Payment date for installment #{selected_inst.installment_number}", default=selected_inst.due_date
             )
 
             selected_inst.mark_paid(paid_date)
@@ -366,11 +359,7 @@ def mark_payment(context: NavigationContext) -> CommandResult:
         return CommandResult(message=_format_marking_result(marked_count, "unpaid"))
 
 
-def _display_payment_overview(
-    stats: PaymentStatistics,
-    categorized: CategorizedPayments,
-    upcoming_days: int
-) -> None:
+def _display_payment_overview(stats: PaymentStatistics, categorized: CategorizedPayments, upcoming_days: int) -> None:
     """
     Display payment overview information.
 
@@ -380,7 +369,7 @@ def _display_payment_overview(
     """
     print("Summary Statistics")
     print("-" * 50)
-    active_count = stats['total_plans'] - stats['fully_paid_count']
+    active_count = stats["total_plans"] - stats["fully_paid_count"]
     print(f"Total Plans: {stats['total_plans']} ({stats['fully_paid_count']} fully paid, {active_count} active)")
     print(f"Total Paid: {format_currency(stats['total_paid'])}")
     print(f"Total Remaining: {format_currency(stats['total_remaining'])}")
@@ -389,46 +378,46 @@ def _display_payment_overview(
 
     print("Payment Timeline")
     print("-" * 50)
-    for days in sorted(stats['time_period_totals'].keys()):
-        total = stats['time_period_totals'][days]
+    for days in sorted(stats["time_period_totals"].keys()):
+        total = stats["time_period_totals"][days]
         print(f"Due in Next {days} Days: {format_currency(total)}")
     print()
 
-    if categorized['overdue']:
+    if categorized["overdue"]:
         print(f"⚠️  OVERDUE PAYMENTS ({len(categorized['overdue'])})")
         print("-" * 50)
-        for p in categorized['overdue']:
+        for p in categorized["overdue"]:
             inst = p.installment
             days_overdue = abs(p.days_until_due)
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
             print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_overdue} days overdue)")
         print()
 
-    if categorized['due_today']:
+    if categorized["due_today"]:
         print(f"🔔 DUE TODAY ({len(categorized['due_today'])})")
         print("-" * 50)
-        for p in categorized['due_today']:
+        for p in categorized["due_today"]:
             inst = p.installment
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
             print(f"    {format_currency(inst.amount)} - Due: {inst.due_date}")
         print()
 
-    if categorized['upcoming']:
-        upcoming_total = sum((p.installment.amount for p in categorized['upcoming']), start=Decimal(0))
+    if categorized["upcoming"]:
+        upcoming_total = sum((p.installment.amount for p in categorized["upcoming"]), start=Decimal(0))
         print(f"📅 UPCOMING (Next {upcoming_days} Days)")
         print("-" * 50)
         print(f"  Count: {len(categorized['upcoming'])}")
         print(f"  Total: {format_currency(upcoming_total)}")
         print()
-        for p in categorized['upcoming']:
+        for p in categorized["upcoming"]:
             inst = p.installment
             days_str = f"in {p.days_until_due} {pluralize(p.days_until_due, 'day')}"
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
             print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_str})")
         print()
 
-    if categorized['future']:
-        future_total = sum((p.installment.amount for p in categorized['future']), start=Decimal(0))
+    if categorized["future"]:
+        future_total = sum((p.installment.amount for p in categorized["future"]), start=Decimal(0))
         print(f"Future Payments (Beyond {upcoming_days} Days)")
         print("-" * 50)
         print(f"  Count: {len(categorized['future'])}")
@@ -490,9 +479,7 @@ def save_plans(context: NavigationContext) -> CommandResult:
     if saved_count == 0:
         return CommandResult(message="No installment plans to save.")
 
-    return CommandResult(
-        message=f"\nSaved {saved_count} plan(s) to {plan_manager.storage_dir}"
-    )
+    return CommandResult(message=f"\nSaved {saved_count} plan(s) to {plan_manager.storage_dir}")
 
 
 def load_plans(context: NavigationContext) -> CommandResult:
@@ -513,9 +500,7 @@ def load_plans(context: NavigationContext) -> CommandResult:
     for error in errors:
         print(error)
 
-    return CommandResult(
-        message=f"\nLoaded {loaded_count} plan(s) from {plan_manager.storage_dir}"
-    )
+    return CommandResult(message=f"\nLoaded {loaded_count} plan(s) from {plan_manager.storage_dir}")
 
 
 def export_plan_csv(context: NavigationContext) -> CommandResult:
@@ -540,14 +525,11 @@ def export_plan_csv(context: NavigationContext) -> CommandResult:
     try:
         plan.to_csv(str(csv_path))
         return CommandResult(message=f"\nPlan exported to {csv_path}")
-    except (OSError, IOError) as e:
+    except OSError as e:
         return CommandResult(message=f"Error exporting plan: {e}")
 
 
-def select_plan(
-    context: NavigationContext,
-    prompt: str = "Select plan number"
-) -> tuple[str, InstallmentPlan] | None:
+def select_plan(context: NavigationContext, prompt: str = "Select plan number") -> tuple[str, InstallmentPlan] | None:
     plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
 
     if not plan_manager.has_plans():
@@ -612,7 +594,7 @@ def _edit_installment_field(
     validate_value: Callable[[Any], tuple[bool, str]],
     apply_update: Callable[[InstallmentPlan, Installment, Any], str],
     warn_if_paid: bool = False,
-    select_installment_fn: Callable[[InstallmentPlan], Installment | None] | None = None
+    select_installment_fn: Callable[[InstallmentPlan], Installment | None] | None = None,
 ) -> CommandResult:
     """
     Generic helper for editing installment fields.
@@ -645,7 +627,7 @@ def _edit_installment_field(
     if warn_if_paid and selected_inst.status == PaymentStatus.PAID:
         print("\nWarning: This installment has already been paid.")
         confirm = get_input("Continue editing? (y/n)", default="n")
-        if confirm.lower() != 'y':
+        if confirm.lower() != "y":
             return CommandResult(message="Edit cancelled.")
 
     current_value = get_current_value(selected_inst)
@@ -670,10 +652,13 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager and edit plan ID
     :return: CommandResult with update status message
     """
+
     def apply_amount_update(plan, installment, new_amount):
         plan.set_installment_amount(installment.installment_number, new_amount)
-        return f"\nInstallment #{installment.installment_number} amount updated to {format_currency(new_amount)}"\
-               f"\nNew total: {format_currency(plan.total_amount)}"
+        return (
+            f"\nInstallment #{installment.installment_number} amount updated to {format_currency(new_amount)}"
+            f"\nNew total: {format_currency(plan.total_amount)}"
+        )
 
     return _edit_installment_field(
         context=context,
@@ -683,12 +668,13 @@ def edit_installment_amount(context: NavigationContext) -> CommandResult:
         prompt_new_value=lambda: get_decimal_input("New amount"),
         validate_value=lambda val: (True, "") if val and val > 0 else (False, "Valid amount is required."),
         apply_update=apply_amount_update,
-        warn_if_paid=True
+        warn_if_paid=True,
     )
 
 
 def edit_installment_due_date(context: NavigationContext) -> CommandResult:
     """Edit the due date of a specific installment"""
+
     def apply_due_date_update(plan, installment, new_due_date):
         plan.set_installment_due_date(installment.installment_number, new_due_date)
         return f"\nInstallment #{installment.installment_number} due date updated to {new_due_date}"
@@ -701,7 +687,7 @@ def edit_installment_due_date(context: NavigationContext) -> CommandResult:
         prompt_new_value=lambda: get_date_input("New due date"),
         validate_value=lambda val: (True, "") if val else (False, "Due date is required."),
         apply_update=apply_due_date_update,
-        warn_if_paid=False
+        warn_if_paid=False,
     )
 
 
@@ -715,8 +701,10 @@ def _select_paid_installment(plan: InstallmentPlan) -> Installment | None:
 
     print("Paid installments:")
     for inst in paid_installments:
-        print(f"  {inst.installment_number}. Installment #{inst.installment_number}: {format_currency(inst.amount)}"
-              f" - Paid on {inst.paid_date}")
+        print(
+            f"  {inst.installment_number}. Installment #{inst.installment_number}: {format_currency(inst.amount)}"
+            f" - Paid on {inst.paid_date}"
+        )
 
     inst_num = get_int_input("\nSelect installment number to edit", min_val=1, max_val=plan.num_installments)
     if not inst_num:
@@ -738,6 +726,7 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
     :param context: Navigation context containing plan manager and edit plan ID
     :return: CommandResult with update status message
     """
+
     def apply_paid_date_update(plan, installment, new_paid_date):
         plan.set_installment_paid_date(installment.installment_number, new_paid_date)
         return f"\nInstallment #{installment.installment_number} paid date updated to {new_paid_date}"
@@ -751,7 +740,7 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
         validate_value=lambda val: (True, "") if val else (False, "Paid date is required."),
         apply_update=apply_paid_date_update,
         warn_if_paid=False,
-        select_installment_fn=_select_paid_installment
+        select_installment_fn=_select_paid_installment,
     )
 
 
@@ -775,21 +764,15 @@ def delete_plan(context: NavigationContext) -> CommandResult:
     print(f"Total: {format_currency(plan.total_amount)}")
     print(f"Remaining: {format_currency(plan.remaining_balance)}")
 
-    confirm = get_input(
-        "\nAre you sure you want to delete this plan? (yes/no)",
-        default="no"
-    )
+    confirm = get_input("\nAre you sure you want to delete this plan? (yes/no)", default="no")
 
-    if confirm.lower() != 'yes':
+    if confirm.lower() != "yes":
         return CommandResult(message="Deletion cancelled.")
 
     plan_manager.remove_plan(plan_id)
     context.clear_data("edit_plan_id")
 
-    return CommandResult(
-        action=NavigationAction.POP,
-        message=f"\nPlan '{plan_id}' deleted successfully."
-    )
+    return CommandResult(action=NavigationAction.POP, message=f"\nPlan '{plan_id}' deleted successfully.")
 
 
 def edit_plan_menu(context: NavigationContext) -> CommandResult:
@@ -822,10 +805,7 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
     edit_menu.add_command("5", Command("Delete Plan", delete_plan))
     edit_menu.add_back_command()
 
-    return CommandResult(
-        action=NavigationAction.PUSH,
-        target_menu=edit_menu
-    )
+    return CommandResult(action=NavigationAction.PUSH, target_menu=edit_menu)
 
 
 def save_and_exit(context: NavigationContext) -> CommandResult:
@@ -934,5 +914,5 @@ def main() -> None:
     print("\nThank you for using Installment Plan Tracker!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

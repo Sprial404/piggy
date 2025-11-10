@@ -21,7 +21,7 @@ class TestPlanManager(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=4,
             days_between=30,
-            first_payment_date=date(2024, 2, 1)
+            first_payment_date=date(2024, 2, 1),
         )
 
     def tearDown(self):
@@ -152,5 +152,5 @@ class TestPlanManager(unittest.TestCase):
         temp_path.rmdir()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

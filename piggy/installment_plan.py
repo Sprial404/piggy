@@ -15,6 +15,7 @@ class PaymentStatus(StrEnum):
     PAID: Payment successfully completed
     OVERDUE: Payment past due date but not yet paid
     """
+
     PENDING = "pending"
     PAID = "paid"
     OVERDUE = "overdue"
@@ -32,10 +33,10 @@ class Installment(BaseModel):
     # noinspection PyNestedDecorators
     # PyCharm incorrectly flags Pydantic's @field_validator + @classmethod pattern as an issue
     # This is the standard Pydantic pattern for field validators
-    @field_validator('paid_date', mode='after')
+    @field_validator("paid_date", mode="after")
     @classmethod
     def ensure_paid_date(cls, value: date | None, info: ValidationInfo) -> date | None:
-        if value is not None and info.data.get('status') != PaymentStatus.PAID:
+        if value is not None and info.data.get("status") != PaymentStatus.PAID:
             raise ValueError("paid_date can only be set when status is PAID")
         return value
 
@@ -100,7 +101,7 @@ class InstallmentPlan(BaseModel):
     # noinspection PyNestedDecorators
     # PyCharm incorrectly flags Pydantic's @field_validator + @classmethod pattern as an issue
     # This is the standard Pydantic pattern for field validators
-    @field_validator('installments', mode='after')
+    @field_validator("installments", mode="after")
     @classmethod
     def validate_installments(cls, value: list[Installment], info: ValidationInfo) -> list[Installment]:
         num_installments = len(value)
@@ -112,14 +113,12 @@ class InstallmentPlan(BaseModel):
         installment_numbers = {inst.installment_number for inst in value}
         expected_numbers = set(range(1, num_installments + 1))
         if installment_numbers != expected_numbers:
-            raise ValueError(
-                f"Installment numbers must be sequential from 1 to {num_installments}"
-            )
+            raise ValueError(f"Installment numbers must be sequential from 1 to {num_installments}")
 
         # Verify total of installments matches total_amount
-        if 'total_amount' in info.data:
+        if "total_amount" in info.data:
             installment_total = sum(inst.amount for inst in value)
-            if installment_total != info.data['total_amount']:
+            if installment_total != info.data["total_amount"]:
                 raise ValueError(
                     f"Sum of installments ({installment_total}) must equal total_amount ({info.data['total_amount']})"
                 )
@@ -149,10 +148,7 @@ class InstallmentPlan(BaseModel):
     @property
     def next_payment_due(self) -> date | None:
         """Get the next payment due date"""
-        unpaid = [
-            inst for inst in self.installments
-            if inst.status == PaymentStatus.PENDING
-        ]
+        unpaid = [inst for inst in self.installments if inst.status == PaymentStatus.PENDING]
         if not unpaid:
             return None
         return min(inst.due_date for inst in unpaid)
@@ -167,10 +163,7 @@ class InstallmentPlan(BaseModel):
         if as_of is None:
             as_of = date.today()
 
-        return [
-            inst for inst in self.installments
-            if inst.status != PaymentStatus.PAID and inst.due_date < as_of
-        ]
+        return [inst for inst in self.installments if inst.status != PaymentStatus.PAID and inst.due_date < as_of]
 
     @property
     def has_overdue_payments(self) -> bool:
@@ -306,8 +299,8 @@ class InstallmentPlan(BaseModel):
         purchase_date: date,
         num_installments: int,
         days_between: int,
-        first_payment_date: date
-    ) -> 'InstallmentPlan':
+        first_payment_date: date,
+    ) -> "InstallmentPlan":
         """
         Build an installment plan with calculated installments.
 
@@ -331,10 +324,7 @@ class InstallmentPlan(BaseModel):
 
         for i in range(1, num_installments + 1):
             installment = Installment(
-                installment_number=i,
-                amount=installment_amount,
-                due_date=current_date,
-                status=PaymentStatus.PENDING
+                installment_number=i, amount=installment_amount, due_date=current_date, status=PaymentStatus.PENDING
             )
             installments.append(installment)
             current_date += timedelta(days=days_between)
@@ -343,7 +333,7 @@ class InstallmentPlan(BaseModel):
             merchant_name=merchant_name,
             total_amount=total_amount,
             purchase_date=purchase_date,
-            installments=installments
+            installments=installments,
         )
 
     def to_json(self, file_path: str | None = None) -> str:
@@ -357,25 +347,25 @@ class InstallmentPlan(BaseModel):
         """
         from piggy.utils.helpers import ensure_directory
 
-        json_data = self.model_dump(mode='json')
+        json_data = self.model_dump(mode="json")
         json_str = json.dumps(json_data, indent=2, default=str)
 
         if file_path:
             validated_path = ensure_directory(file_path)
-            validated_path.write_text(json_str, encoding='utf-8')
+            validated_path.write_text(json_str, encoding="utf-8")
 
         return json_str
 
     @classmethod
-    def from_json(cls, json_data: str) -> 'InstallmentPlan':
+    def from_json(cls, json_data: str) -> "InstallmentPlan":
         """Deserialize an installment plan from JSON string"""
         data = json.loads(json_data)
         return cls.model_validate(data)
 
     @classmethod
-    def from_json_file(cls, file_path: str) -> 'InstallmentPlan':
+    def from_json_file(cls, file_path: str) -> "InstallmentPlan":
         """Load an installment plan from a JSON file"""
-        json_str = Path(file_path).read_text(encoding='utf-8')
+        json_str = Path(file_path).read_text(encoding="utf-8")
         return cls.from_json(json_str)
 
     def to_csv(self, file_path: str) -> str:
@@ -390,34 +380,43 @@ class InstallmentPlan(BaseModel):
         :raises ValueError: If file_path is an existing directory
         :raises OSError: If file write fails or parent directory cannot be created
         """
-        from piggy.utils.csv_writer import write_csv_from_dicts, format_value
+        from piggy.utils.csv_writer import format_value, write_csv_from_dicts
         from piggy.utils.helpers import ensure_directory
 
         # Validate path before processing
         ensure_directory(file_path)
 
         headers = [
-            'merchant_name', 'total_amount', 'purchase_date',
-            'created_at', 'updated_at', 'installment_number',
-            'amount', 'due_date', 'status', 'paid_date',
-            'is_paid', 'is_pending', 'is_overdue'
+            "merchant_name",
+            "total_amount",
+            "purchase_date",
+            "created_at",
+            "updated_at",
+            "installment_number",
+            "amount",
+            "due_date",
+            "status",
+            "paid_date",
+            "is_paid",
+            "is_pending",
+            "is_overdue",
         ]
 
         rows = [
             {
-                'merchant_name': self.merchant_name,
-                'total_amount': format_value(self.total_amount),
-                'purchase_date': format_value(self.purchase_date),
-                'created_at': format_value(self.created_at),
-                'updated_at': format_value(self.updated_at),
-                'installment_number': inst.installment_number,
-                'amount': format_value(inst.amount),
-                'due_date': format_value(inst.due_date),
-                'status': inst.status.value,
-                'paid_date': format_value(inst.paid_date),
-                'is_paid': inst.is_paid,
-                'is_pending': inst.is_pending,
-                'is_overdue': inst.is_overdue
+                "merchant_name": self.merchant_name,
+                "total_amount": format_value(self.total_amount),
+                "purchase_date": format_value(self.purchase_date),
+                "created_at": format_value(self.created_at),
+                "updated_at": format_value(self.updated_at),
+                "installment_number": inst.installment_number,
+                "amount": format_value(inst.amount),
+                "due_date": format_value(inst.due_date),
+                "status": inst.status.value,
+                "paid_date": format_value(inst.paid_date),
+                "is_paid": inst.is_paid,
+                "is_pending": inst.is_pending,
+                "is_overdue": inst.is_overdue,
             }
             for inst in self.installments
         ]

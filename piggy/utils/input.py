@@ -49,10 +49,8 @@ def get_decimal_input(prompt: str, default: Decimal | None = None) -> Decimal | 
     """
     while True:
         try:
-            if default is not None:
-                value = input(f"{prompt} [{default}]: ").strip()
-            else:
-                value = input(f"{prompt}: ").strip()
+            prompt_text = f"{prompt} [{default}]: " if default is not None else f"{prompt}: "
+            value = input(prompt_text).strip()
 
             if not value:
                 return default
@@ -96,28 +94,17 @@ def get_date_input(prompt: str, default: date | None = None) -> date | None:
 
 
 @overload
-def get_int_input(
-        prompt: str,
-        default: int,
-        min_val: int | None = None,
-        max_val: int | None = None
-) -> int: ...
+def get_int_input(prompt: str, default: int, min_val: int | None = None, max_val: int | None = None) -> int: ...
 
 
 @overload
 def get_int_input(
-        prompt: str,
-        default: None = None,
-        min_val: int | None = None,
-        max_val: int | None = None
+    prompt: str, default: None = None, min_val: int | None = None, max_val: int | None = None
 ) -> int | None: ...
 
 
 def get_int_input(
-        prompt: str,
-        default: int | None = None,
-        min_val: int | None = None,
-        max_val: int | None = None
+    prompt: str, default: int | None = None, min_val: int | None = None, max_val: int | None = None
 ) -> int | None:
     """
     Get an integer input from the user with validation or an optional default value.
@@ -141,10 +128,8 @@ def get_int_input(
 
     while True:
         try:
-            if default:
-                value = input(f"{prompt} ({default}): ").strip()
-            else:
-                value = input(f"{prompt}: ").strip()
+            prompt_text = f"{prompt} ({default}): " if default else f"{prompt}: "
+            value = input(prompt_text).strip()
 
             if not value:
                 return default

@@ -5,17 +5,19 @@ This module contains pure business logic functions for analyzing installment pla
 categorizing payments, and calculating statistics. All functions are pure (no I/O)
 and testable.
 """
+
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import TypedDict
 
-from piggy.installment_plan import InstallmentPlan, Installment
+from piggy.installment_plan import Installment, InstallmentPlan
 
 
 @dataclass
 class PaymentInfo:
     """Information about a payment installment for display purposes."""
+
     plan_id: str
     merchant: str
     installment: Installment
@@ -24,6 +26,7 @@ class PaymentInfo:
 
 class CategorizedPayments(TypedDict):
     """Categorized payment installments by due date."""
+
     all_unpaid: list[PaymentInfo]
     overdue: list[PaymentInfo]
     due_today: list[PaymentInfo]
@@ -33,6 +36,7 @@ class CategorizedPayments(TypedDict):
 
 class PaymentStatistics(TypedDict):
     """Summary statistics for payment overview."""
+
     total_plans: int
     fully_paid_count: int
     total_paid: Decimal
@@ -44,9 +48,7 @@ class PaymentStatistics(TypedDict):
 
 
 def categorize_unpaid_installments(
-    plans_dict: dict[str, InstallmentPlan],
-    today: date,
-    upcoming_days: int
+    plans_dict: dict[str, InstallmentPlan], today: date, upcoming_days: int
 ) -> CategorizedPayments:
     """
     Categorize unpaid installments by due date.
@@ -61,12 +63,14 @@ def categorize_unpaid_installments(
         # Cache unpaid_installments to avoid repeated property access
         unpaid = plan.unpaid_installments
         for inst in unpaid:
-            all_unpaid.append(PaymentInfo(
-                plan_id=plan_id,
-                merchant=plan.merchant_name,
-                installment=inst,
-                days_until_due=(inst.due_date - today).days
-            ))
+            all_unpaid.append(
+                PaymentInfo(
+                    plan_id=plan_id,
+                    merchant=plan.merchant_name,
+                    installment=inst,
+                    days_until_due=(inst.due_date - today).days,
+                )
+            )
 
     all_unpaid.sort(key=lambda x: x.installment.due_date)
 
@@ -76,18 +80,12 @@ def categorize_unpaid_installments(
     future = [p for p in all_unpaid if p.days_until_due > upcoming_days]
 
     return CategorizedPayments(
-        all_unpaid=all_unpaid,
-        overdue=overdue,
-        due_today=due_today,
-        upcoming=upcoming,
-        future=future
+        all_unpaid=all_unpaid, overdue=overdue, due_today=due_today, upcoming=upcoming, future=future
     )
 
 
 def calculate_payment_statistics(
-    plans_dict: dict[str, InstallmentPlan],
-    categorized: CategorizedPayments,
-    time_periods: list[int]
+    plans_dict: dict[str, InstallmentPlan], categorized: CategorizedPayments, time_periods: list[int]
 ) -> PaymentStatistics:
     """
     Calculate summary statistics for payment overview.
@@ -109,26 +107,24 @@ def calculate_payment_statistics(
         if plan.is_fully_paid:
             fully_paid_count += 1
 
-    overdue_total = sum((p.installment.amount for p in categorized['overdue']), start=Decimal(0))
-    due_today_total = sum((p.installment.amount for p in categorized['due_today']), start=Decimal(0))
+    overdue_total = sum((p.installment.amount for p in categorized["overdue"]), start=Decimal(0))
+    due_today_total = sum((p.installment.amount for p in categorized["due_today"]), start=Decimal(0))
 
     time_period_totals = {}
     for days in time_periods:
         period_total = overdue_total + due_today_total
         period_total += sum(
-            (p.installment.amount for p in categorized['all_unpaid']
-             if 0 < p.days_until_due <= days),
-            start=Decimal(0)
+            (p.installment.amount for p in categorized["all_unpaid"] if 0 < p.days_until_due <= days), start=Decimal(0)
         )
         time_period_totals[days] = period_total
 
     return {
-        'total_plans': total_plans,
-        'fully_paid_count': fully_paid_count,
-        'total_paid': total_paid,
-        'total_remaining': total_remaining,
-        'total_unpaid_installments': len(categorized['all_unpaid']),
-        'overdue_total': overdue_total,
-        'due_today_total': due_today_total,
-        'time_period_totals': time_period_totals
+        "total_plans": total_plans,
+        "fully_paid_count": fully_paid_count,
+        "total_paid": total_paid,
+        "total_remaining": total_remaining,
+        "total_unpaid_installments": len(categorized["all_unpaid"]),
+        "overdue_total": overdue_total,
+        "due_today_total": due_today_total,
+        "time_period_totals": time_period_totals,
     }

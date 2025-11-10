@@ -15,7 +15,7 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=4,
             days_between=30,
-            first_payment_date=date(2024, 2, 1)
+            first_payment_date=date(2024, 2, 1),
         )
 
         self.assertEqual(plan.merchant_name, "Test Store")
@@ -36,14 +36,10 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=3,
             days_between=14,
-            first_payment_date=date(2024, 1, 15)
+            first_payment_date=date(2024, 1, 15),
         )
 
-        expected_dates = [
-            date(2024, 1, 15),
-            date(2024, 1, 29),
-            date(2024, 2, 12)
-        ]
+        expected_dates = [date(2024, 1, 15), date(2024, 1, 29), date(2024, 2, 12)]
 
         for i, inst in enumerate(plan.installments):
             self.assertEqual(inst.due_date, expected_dates[i])
@@ -56,7 +52,7 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=5,
             days_between=7,
-            first_payment_date=date(2024, 1, 8)
+            first_payment_date=date(2024, 1, 8),
         )
 
         for i, inst in enumerate(plan.installments, start=1):
@@ -70,7 +66,7 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=1,
             days_between=30,
-            first_payment_date=date(2024, 2, 1)
+            first_payment_date=date(2024, 2, 1),
         )
 
         self.assertEqual(len(plan.installments), 1)
@@ -85,15 +81,10 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=4,
             days_between=7,
-            first_payment_date=date(2024, 1, 8)
+            first_payment_date=date(2024, 1, 8),
         )
 
-        expected_dates = [
-            date(2024, 1, 8),
-            date(2024, 1, 15),
-            date(2024, 1, 22),
-            date(2024, 1, 29)
-        ]
+        expected_dates = [date(2024, 1, 8), date(2024, 1, 15), date(2024, 1, 22), date(2024, 1, 29)]
 
         for i, inst in enumerate(plan.installments):
             self.assertEqual(inst.due_date, expected_dates[i])
@@ -106,7 +97,7 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=4,
             days_between=14,
-            first_payment_date=date(2024, 1, 15)
+            first_payment_date=date(2024, 1, 15),
         )
 
         expected_amount = Decimal("140.00")
@@ -121,14 +112,10 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=3,
             days_between=21,
-            first_payment_date=date(2024, 1, 22)
+            first_payment_date=date(2024, 1, 22),
         )
 
-        expected_dates = [
-            date(2024, 1, 22),
-            date(2024, 2, 12),
-            date(2024, 3, 4)
-        ]
+        expected_dates = [date(2024, 1, 22), date(2024, 2, 12), date(2024, 3, 4)]
 
         for i, inst in enumerate(plan.installments):
             self.assertEqual(inst.due_date, expected_dates[i])
@@ -141,7 +128,7 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=10,
             days_between=30,
-            first_payment_date=date(2024, 2, 1)
+            first_payment_date=date(2024, 2, 1),
         )
 
         for inst in plan.installments:
@@ -156,7 +143,7 @@ class TestBuildInstallmentPlan(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=3,
             days_between=30,
-            first_payment_date=date(2024, 2, 1)
+            first_payment_date=date(2024, 2, 1),
         )
 
         self.assertEqual(plan.num_installments, 3)
@@ -176,7 +163,7 @@ class TestGetInstallments(unittest.TestCase):
             purchase_date=date(2024, 1, 1),
             num_installments=4,
             days_between=30,
-            first_payment_date=date(2024, 2, 1)
+            first_payment_date=date(2024, 2, 1),
         )
 
     def test_get_all_installments_with_none(self):
@@ -228,5 +215,5 @@ class TestGetInstallments(unittest.TestCase):
         self.assertEqual(result, [])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
