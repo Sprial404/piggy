@@ -509,28 +509,17 @@ def _display_payment_overview(
         print()
 
     if categorized['upcoming']:
-        print(f"📅 UPCOMING (Next {upcoming_days} Days) ({len(categorized['upcoming'])})")
+        upcoming_total = sum((p.installment.amount for p in categorized['upcoming']), start=Decimal(0))
+        print(f"📅 UPCOMING (Next {upcoming_days} Days)")
         print("-" * 50)
+        print(f"  Count: {len(categorized['upcoming'])}")
+        print(f"  Total: {format_currency(upcoming_total)}")
+        print()
         for p in categorized['upcoming']:
             inst = p.installment
             days_str = f"in {p.days_until_due} day" + ("s" if p.days_until_due > 1 else "")
             print(f"  {p.merchant} - Installment #{inst.installment_number}")
             print(f"    {format_currency(inst.amount)} - Due: {inst.due_date} ({days_str})")
-        print()
-
-    if categorized['all_unpaid']:
-        next_payment = categorized['all_unpaid'][0]
-        inst = next_payment.installment
-        print("Next Payment Due")
-        print("-" * 50)
-        print(f"  {next_payment.merchant} - Installment #{inst.installment_number}")
-        print(f"  {format_currency(inst.amount)} - Due: {inst.due_date}")
-        if next_payment.days_until_due < 0:
-            print(f"  Status: {abs(next_payment.days_until_due)} days overdue")
-        elif next_payment.days_until_due == 0:
-            print(f"  Status: Due today")
-        else:
-            print(f"  Status: Due in {next_payment.days_until_due} days")
         print()
 
     if categorized['future']:
