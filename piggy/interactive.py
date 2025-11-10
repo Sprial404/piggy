@@ -1,12 +1,14 @@
+import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import IntEnum
+from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import ValidationError
 
 from piggy.analytics import (
-    PaymentInfo, CategorizedPayments, PaymentStatistics,
+    CategorizedPayments, PaymentStatistics,
     categorize_unpaid_installments, calculate_payment_statistics
 )
 from piggy.installment_plan import InstallmentPlan, PaymentStatus, Installment
@@ -884,8 +886,13 @@ def exit_without_saving(context: NavigationContext) -> CommandResult:
 
 
 def main() -> None:
-    project_dir = get_project_root()
-    storage_dir = project_dir / "data"
+    # Use environment variable for storage path, fall back to default
+    storage_path = os.environ.get("PIGGY_DATA_DIR")
+    if storage_path:
+        storage_dir = Path(storage_path)
+    else:
+        project_dir = get_project_root()
+        storage_dir = project_dir / "data"
 
     plan_manager = PlanManager(storage_dir)
 
