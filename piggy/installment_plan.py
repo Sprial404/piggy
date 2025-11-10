@@ -30,6 +30,8 @@ class Installment(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
     # noinspection PyNestedDecorators
+    # PyCharm incorrectly flags Pydantic's @field_validator + @classmethod pattern as an issue
+    # This is the standard Pydantic pattern for field validators
     @field_validator('paid_date', mode='after')
     @classmethod
     def ensure_paid_date(cls, value: date | None, info: ValidationInfo) -> date | None:
@@ -96,6 +98,8 @@ class InstallmentPlan(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
     # noinspection PyNestedDecorators
+    # PyCharm incorrectly flags Pydantic's @field_validator + @classmethod pattern as an issue
+    # This is the standard Pydantic pattern for field validators
     @field_validator('installments', mode='after')
     @classmethod
     def validate_installments(cls, value: list[Installment], info: ValidationInfo) -> list[Installment]:
