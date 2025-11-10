@@ -2,8 +2,7 @@
 Business logic for payment analytics and calculations.
 
 This module contains pure business logic functions for analyzing installment plans,
-categorizing payments, and calculating statistics. All functions are pure (no I/O)
-and testable.
+categorizing payments, and calculating statistics.
 """
 
 from dataclasses import dataclass
