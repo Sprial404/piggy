@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -99,12 +100,20 @@ class BaseCommand(ABC):
 
 
 class Command(BaseCommand):
-    def __init__(self, description: str, execute_fn: Callable[[NavigationContext], CommandResult]):
+    def __init__(
+        self, description: str, execute_fn: Callable[[NavigationContext], CommandResult] | Callable[[], CommandResult]
+    ):
         self._description = description
         self._execute_fn = execute_fn
 
+        sig = inspect.signature(execute_fn)
+        self._needs_context = len(sig.parameters) > 0
+
     def execute(self, context: NavigationContext) -> CommandResult:
-        return self._execute_fn(context)
+        if self._needs_context:
+            return self._execute_fn(context)
+        else:
+            return self._execute_fn()
 
     def description(self) -> str:
         return self._description
