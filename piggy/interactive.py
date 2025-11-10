@@ -558,16 +558,15 @@ def select_plan(
 
     print("Available plans:")
     plans_dict = plan_manager.list_plans()
-    plan_ids = list(plans_dict.keys())
-    for idx, plan_id in enumerate(plan_ids, 1):
-        plan = plans_dict[plan_id]
+    plan_items = list(plans_dict.items())
+    for idx, (plan_id, plan) in enumerate(plan_items, 1):
         print(f"{idx}. {plan_id} - {format_currency(plan.total_amount)} ({plan.merchant_name})")
 
-    choice = get_int_input(f"\n{prompt}", min_val=1, max_val=len(plan_ids))
+    choice = get_int_input(f"\n{prompt}", min_val=1, max_val=len(plan_items))
     if not choice:
         return None
 
-    plan_id = plan_ids[choice - 1]
+    plan_id, _ = plan_items[choice - 1]
     return plan_id, plan_manager.get_plan(plan_id)
 
 
