@@ -11,12 +11,10 @@ def format_error_message(exception: Exception, include_traceback: bool = False) 
     :return: Formatted error message string
     """
     if include_traceback:
-        # Capture traceback to string
         tb_output = StringIO()
         traceback.print_exc(file=tb_output)
         tb_string = tb_output.getvalue()
 
-        # Format with prominent header
         lines = [
             "",
             "=" * 50,
@@ -28,7 +26,6 @@ def format_error_message(exception: Exception, include_traceback: bool = False) 
         ]
         return "\n".join(lines)
     else:
-        # Simple error message for expected errors
         return f"Error: {exception}"
 
 
