@@ -1,0 +1,9 @@
+# Development dependencies
+-r requirements.txt
+
+# Code formatting and linting
+black==24.10.0
+ruff==0.7.4
+
+# Pre-commit hooks
+pre-commit==4.0.1
