@@ -409,12 +409,11 @@ def mark_payment(context: NavigationContext) -> CommandResult:
         return CommandResult(message=_format_marking_result(marked_count, "unpaid"))
 
 
-def format_payment_date_header(due_date: date, days_until_due: int | None = None) -> str:
+def format_payment_date_header(due_date: date) -> str:
     """
     Format the date header for a group of payments.
 
     :param due_date: The due date to display
-    :param days_until_due: Optional days until due (for context display)
     :return: Formatted date header string
     """
     return f"Due: {due_date}"
