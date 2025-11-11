@@ -2,7 +2,9 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
-from piggy.installment_plan import InstallmentPlan, PaymentStatus
+from pydantic import ValidationError
+
+from piggy.installment_plan import Installment, InstallmentPlan, PaymentStatus
 
 
 class TestBuildInstallmentPlan(unittest.TestCase):
@@ -213,6 +215,161 @@ class TestGetInstallments(unittest.TestCase):
         result = self.plan.get_installments([])
         self.assertEqual(len(result), 0)
         self.assertEqual(result, [])
+
+
+class TestPartialPayments(unittest.TestCase):
+    """Test partial payment functionality"""
+
+    def test_amount_paid_defaults_to_zero(self):
+        """Test that amount_paid defaults to zero for new installments"""
+        inst = Installment(installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1))
+        self.assertEqual(inst.amount_paid, Decimal("0"))
+
+    def test_remaining_amount_calculation(self):
+        """Test remaining_amount property calculates correctly"""
+        inst = Installment(
+            installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1), amount_paid=Decimal("30.00")
+        )
+        self.assertEqual(inst.remaining_amount, Decimal("70.00"))
+
+    def test_is_partially_paid_property(self):
+        """Test is_partially_paid property returns correct values"""
+        inst = Installment(installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1))
+
+        # Not paid at all
+        self.assertFalse(inst.is_partially_paid)
+
+        # Partially paid
+        inst.amount_paid = Decimal("50.00")
+        self.assertTrue(inst.is_partially_paid)
+
+        # Fully paid
+        inst.amount_paid = Decimal("100.00")
+        self.assertFalse(inst.is_partially_paid)
+
+    def test_mark_partial_payment_success(self):
+        """Test marking a partial payment works correctly"""
+        inst = Installment(installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1))
+
+        inst.mark_partial_payment(Decimal("30.00"), date(2024, 2, 5))
+
+        self.assertEqual(inst.amount_paid, Decimal("30.00"))
+        self.assertEqual(inst.remaining_amount, Decimal("70.00"))
+        self.assertTrue(inst.is_partially_paid)
+        self.assertEqual(inst.status, PaymentStatus.PENDING)
+        self.assertIsNone(inst.paid_date)
+
+    def test_mark_partial_payment_multiple_times(self):
+        """Test multiple partial payments accumulate correctly"""
+        inst = Installment(installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1))
+
+        inst.mark_partial_payment(Decimal("30.00"), date(2024, 2, 5))
+        inst.mark_partial_payment(Decimal("20.00"), date(2024, 2, 10))
+
+        self.assertEqual(inst.amount_paid, Decimal("50.00"))
+        self.assertEqual(inst.remaining_amount, Decimal("50.00"))
+        self.assertTrue(inst.is_partially_paid)
+
+    def test_mark_partial_payment_completes_to_paid(self):
+        """Test partial payment that completes the full amount marks as PAID"""
+        inst = Installment(installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1))
+
+        inst.mark_partial_payment(Decimal("60.00"), date(2024, 2, 5))
+        inst.mark_partial_payment(Decimal("40.00"), date(2024, 2, 10))
+
+        self.assertEqual(inst.amount_paid, Decimal("100.00"))
+        self.assertEqual(inst.remaining_amount, Decimal("0"))
+        self.assertFalse(inst.is_partially_paid)
+        self.assertEqual(inst.status, PaymentStatus.PAID)
+        self.assertEqual(inst.paid_date, date(2024, 2, 10))
+
+    def test_mark_partial_payment_exceeds_amount_raises_error(self):
+        """Test that partial payment exceeding remaining amount raises ValueError"""
+        inst = Installment(
+            installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1), amount_paid=Decimal("60.00")
+        )
+
+        with self.assertRaises(ValueError) as context:
+            inst.mark_partial_payment(Decimal("50.00"), date(2024, 2, 5))
+
+        self.assertIn("exceed remaining balance", str(context.exception))
+
+    def test_amount_paid_cannot_exceed_amount_validation(self):
+        """Test Pydantic validation prevents amount_paid > amount"""
+        with self.assertRaises(ValidationError) as context:
+            Installment(
+                installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1), amount_paid=Decimal("150.00")
+            )
+
+        self.assertIn("amount_paid cannot exceed", str(context.exception))
+
+    def test_mark_paid_sets_amount_paid(self):
+        """Test mark_paid sets amount_paid to full amount"""
+        inst = Installment(
+            installment_number=1, amount=Decimal("100.00"), due_date=date(2024, 2, 1), amount_paid=Decimal("30.00")
+        )
+
+        inst.mark_full_payment(date(2024, 2, 5))
+
+        self.assertEqual(inst.amount_paid, Decimal("100.00"))
+        self.assertEqual(inst.remaining_amount, Decimal("0"))
+        self.assertEqual(inst.status, PaymentStatus.PAID)
+        self.assertEqual(inst.paid_date, date(2024, 2, 5))
+
+    def test_mark_unpaid_resets_amount_paid(self):
+        """Test mark_unpaid resets amount_paid to zero"""
+        inst = Installment(
+            installment_number=1,
+            amount=Decimal("100.00"),
+            due_date=date(2024, 2, 1),
+            status=PaymentStatus.PAID,
+            paid_date=date(2024, 2, 5),
+            amount_paid=Decimal("100.00"),
+        )
+
+        inst.mark_unpaid()
+
+        self.assertEqual(inst.amount_paid, Decimal("0"))
+        self.assertEqual(inst.remaining_amount, Decimal("100.00"))
+        self.assertEqual(inst.status, PaymentStatus.PENDING)
+        self.assertIsNone(inst.paid_date)
+
+    def test_remaining_balance_with_partial_payments(self):
+        """Test InstallmentPlan.remaining_balance accounts for partial payments"""
+        plan = InstallmentPlan(
+            merchant_name="Test Store",
+            total_amount=Decimal("300.00"),
+            purchase_date=date(2024, 1, 1),
+            installments=[
+                Installment(
+                    installment_number=1,
+                    amount=Decimal("100.00"),
+                    due_date=date(2024, 2, 1),
+                    amount_paid=Decimal("50.00"),  # Partially paid
+                ),
+                Installment(
+                    installment_number=2,
+                    amount=Decimal("100.00"),
+                    due_date=date(2024, 3, 1),
+                    status=PaymentStatus.PAID,
+                    paid_date=date(2024, 3, 1),
+                    amount_paid=Decimal("100.00"),  # Fully paid
+                ),
+                Installment(
+                    installment_number=3,
+                    amount=Decimal("100.00"),
+                    due_date=date(2024, 4, 1),
+                    # Not paid - amount_paid defaults to 0
+                ),
+            ],
+        )
+
+        # Remaining balance should be:
+        # Installment 1: 50.00 remaining
+        # Installment 2: 0.00 remaining (paid)
+        # Installment 3: 100.00 remaining
+        # Total: 150.00
+        self.assertEqual(plan.remaining_balance, Decimal("150.00"))
 
 
 if __name__ == "__main__":

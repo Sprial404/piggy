@@ -27,6 +27,7 @@ class Installment(BaseModel):
     due_date: date
     status: PaymentStatus = PaymentStatus.PENDING
     paid_date: date | None = None
+    amount_paid: Decimal = Field(default=Decimal(0), ge=0)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -38,6 +39,14 @@ class Installment(BaseModel):
     def ensure_paid_date(cls, value: date | None, info: ValidationInfo) -> date | None:
         if value is not None and info.data.get("status") != PaymentStatus.PAID:
             raise ValueError("paid_date can only be set when status is PAID")
+        return value
+
+    # noinspection PyNestedDecorators
+    @field_validator("amount_paid", mode="after")
+    @classmethod
+    def validate_amount_paid(cls, value: Decimal, info: ValidationInfo) -> Decimal:
+        if "amount" in info.data and value > info.data["amount"]:
+            raise ValueError("amount_paid cannot exceed installment amount")
         return value
 
     @property
@@ -54,6 +63,21 @@ class Installment(BaseModel):
     def is_overdue(self) -> bool:
         """Check if this installment is overdue."""
         return self.status == PaymentStatus.OVERDUE
+
+    @property
+    def remaining_amount(self) -> Decimal:
+        """Calculate remaining amount to be paid."""
+        return self.amount - self.amount_paid
+
+    @property
+    def is_partially_paid(self) -> bool:
+        """Check if this installment is partially paid."""
+        return 0 < self.amount_paid < self.amount
+
+    @property
+    def is_unpaid(self) -> bool:
+        """Check if this installment is completely unpaid (no payments made)."""
+        return self.status == PaymentStatus.PENDING and self.amount_paid == 0
 
     def set_amount(self, new_amount: Decimal) -> None:
         """Set installment amount."""
@@ -77,16 +101,68 @@ class Installment(BaseModel):
         self.paid_date = new_paid_date
         self.updated_at = datetime.now()
 
-    def mark_paid(self, paid_date: date) -> None:
+    def set_amount_paid(self, new_amount_paid: Decimal) -> None:
+        """
+        Set the amount paid directly.
+
+        If the new amount paid equals the full installment amount, the installment
+        is automatically marked as PAID with the current date.
+
+        :param new_amount_paid: New amount paid value
+        :raises ValueError: If amount_paid exceeds installment amount or is negative
+        """
+        if new_amount_paid < 0:
+            raise ValueError("Amount paid cannot be negative.")
+        if new_amount_paid > self.amount:
+            raise ValueError(f"Amount paid cannot exceed installment amount of {self.amount}.")
+        self.amount_paid = new_amount_paid
+
+        if self.amount_paid == self.amount:
+            self.status = PaymentStatus.PAID
+            if not self.paid_date:
+                self.paid_date = date.today()
+        elif self.status == PaymentStatus.PAID:
+            self.status = PaymentStatus.PENDING
+            self.paid_date = None
+
+        self.updated_at = datetime.now()
+
+    def mark_full_payment(self, paid_date: date) -> None:
         """Mark as paid with date."""
         self.status = PaymentStatus.PAID
         self.paid_date = paid_date
+        self.amount_paid = self.amount
         self.updated_at = datetime.now()
 
     def mark_unpaid(self) -> None:
         """Mark as pending (unpaid) and clear paid date."""
         self.status = PaymentStatus.PENDING
         self.paid_date = None
+        self.amount_paid = Decimal(0)
+        self.updated_at = datetime.now()
+
+    def mark_partial_payment(self, amount: Decimal, payment_date: date) -> None:
+        """
+        Record a partial payment by adding it to the amount already paid.
+
+        This method accumulates payments. The amount is added to the existing
+        amount_paid. If the total reaches the full installment amount, the
+        installment is automatically marked as PAID.
+
+        :param amount: Amount being paid (to be added to existing amount paid).
+        :param payment_date: Date of payment
+        :raises ValueError: If amount exceeds remaining balance
+        """
+        new_total_paid = self.amount_paid + amount
+        if new_total_paid > self.amount:
+            raise ValueError(f"Payment of {amount} would exceed remaining balance of {self.remaining_amount}")
+
+        self.amount_paid = new_total_paid
+
+        if self.amount_paid == self.amount:
+            self.status = PaymentStatus.PAID
+            self.paid_date = payment_date
+
         self.updated_at = datetime.now()
 
 
@@ -138,7 +214,7 @@ class InstallmentPlan(BaseModel):
     @property
     def remaining_balance(self) -> Decimal:
         """Calculate the remaining balance from unpaid installments"""
-        return sum((inst.amount for inst in self.unpaid_installments), start=Decimal(0))
+        return sum((inst.remaining_amount for inst in self.unpaid_installments), start=Decimal(0))
 
     @property
     def is_fully_paid(self) -> bool:
@@ -278,7 +354,7 @@ class InstallmentPlan(BaseModel):
         :raises ValueError: If installment number does not exist
         """
         installment = self.get_installment(number)
-        installment.mark_paid(paid_date)
+        installment.mark_full_payment(paid_date)
         self.updated_at = datetime.now()
 
     def mark_installment_unpaid(self, number: int) -> None:
@@ -397,9 +473,12 @@ class InstallmentPlan(BaseModel):
             "due_date",
             "status",
             "paid_date",
+            "amount_paid",
+            "remaining_amount",
             "is_paid",
             "is_pending",
             "is_overdue",
+            "is_partially_paid",
         ]
 
         rows = [
@@ -414,9 +493,12 @@ class InstallmentPlan(BaseModel):
                 "due_date": format_value(inst.due_date),
                 "status": inst.status.value,
                 "paid_date": format_value(inst.paid_date),
+                "amount_paid": format_value(inst.amount_paid),
+                "remaining_amount": format_value(inst.remaining_amount),
                 "is_paid": inst.is_paid,
                 "is_pending": inst.is_pending,
                 "is_overdue": inst.is_overdue,
+                "is_partially_paid": inst.is_partially_paid,
             }
             for inst in self.installments
         ]

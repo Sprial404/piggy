@@ -130,7 +130,7 @@ class TestInstallmentPlanSerialization(unittest.TestCase):
             lines = content.strip().split("\n")
 
             # Check header matches flattened CSV format
-            expected_headers = "merchant_name,total_amount,purchase_date,created_at,updated_at,installment_number,amount,due_date,status,paid_date,is_paid,is_pending,is_overdue"
+            expected_headers = "merchant_name,total_amount,purchase_date,created_at,updated_at,installment_number,amount,due_date,status,paid_date,amount_paid,remaining_amount,is_paid,is_pending,is_overdue,is_partially_paid"
             self.assertEqual(lines[0], expected_headers)
 
             # Verify key data appears in CSV
@@ -501,7 +501,7 @@ class TestInstallmentPlanSetters(unittest.TestCase):
         old_updated_at = inst.updated_at
 
         paid_date = date(2024, 1, 31)
-        inst.mark_paid(paid_date)
+        inst.mark_full_payment(paid_date)
 
         self.assertEqual(inst.status, PaymentStatus.PAID)
         self.assertEqual(inst.paid_date, paid_date)
@@ -512,7 +512,7 @@ class TestInstallmentPlanSetters(unittest.TestCase):
         inst = self.plan.installments[0]
 
         # First mark as paid
-        inst.mark_paid(date(2024, 1, 31))
+        inst.mark_full_payment(date(2024, 1, 31))
 
         # Then mark as unpaid
         inst.mark_unpaid()
@@ -536,6 +536,47 @@ class TestInstallmentPlanSetters(unittest.TestCase):
             inst.set_amount(Decimal("0"))
 
         self.assertIn("greater than zero", str(context.exception))
+
+
+class TestPartialPaymentSerialization(unittest.TestCase):
+    """Test serialization with partial payments"""
+
+    def test_backward_compatibility_loading_old_plans(self):
+        """Test that plans without amount_paid field load correctly"""
+        json_data = json.dumps(
+            {
+                "merchant_name": "Old Store",
+                "total_amount": "200.00",
+                "purchase_date": "2024-01-01",
+                "installments": [
+                    {
+                        "installment_number": 1,
+                        "amount": "100.00",
+                        "due_date": "2024-02-01",
+                        "status": "pending",
+                        # No amount_paid field - should default to 0
+                    },
+                    {
+                        "installment_number": 2,
+                        "amount": "100.00",
+                        "due_date": "2024-03-01",
+                        "status": "paid",
+                        "paid_date": "2024-03-01",
+                        # No amount_paid field - should default to 0
+                    },
+                ],
+            }
+        )
+
+        plan = InstallmentPlan.from_json(json_data)
+
+        # Check installment 1 defaults
+        self.assertEqual(plan.installments[0].amount_paid, Decimal("0"))
+        self.assertEqual(plan.installments[0].remaining_amount, Decimal("100.00"))
+
+        # Check installment 2 defaults (even though marked paid)
+        # This is OK - we'll update amount_paid when we call mark_paid()
+        self.assertEqual(plan.installments[1].amount_paid, Decimal("0"))
 
 
 if __name__ == "__main__":

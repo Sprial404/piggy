@@ -218,8 +218,17 @@ def format_installment_line(
     :param indent: Indentation string
     :return: Formatted installment line
     """
-    status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
+    if inst.status == PaymentStatus.PAID:
+        status_symbol = "✓"
+    elif inst.is_partially_paid:
+        status_symbol = "◐"
+    else:
+        status_symbol = "○"
+
     line = f"{indent}{status_symbol} #{inst.installment_number}: {format_currency(inst.amount)} due {inst.due_date}"
+
+    if inst.is_partially_paid:
+        line += f" [Paid: {format_currency(inst.amount_paid)}, Remaining: {format_currency(inst.remaining_amount)}]"
 
     if show_status:
         line += f" [{inst.status.value}]"
@@ -238,8 +247,18 @@ def _display_installments(plan: InstallmentPlan) -> None:
     """
     print("\nAll installments:")
     for inst in plan.installments:
-        status_symbol = "✓" if inst.status == PaymentStatus.PAID else "○"
-        status_text = f" [PAID on {inst.paid_date}]" if inst.status == PaymentStatus.PAID else ""
+        if inst.status == PaymentStatus.PAID:
+            status_symbol = "✓"
+            status_text = f" [PAID on {inst.paid_date}]"
+        elif inst.is_partially_paid:
+            status_symbol = "◐"
+            status_text = (
+                f" [Paid: {format_currency(inst.amount_paid)}, Remaining: {format_currency(inst.remaining_amount)}]"
+            )
+        else:
+            status_symbol = "○"
+            status_text = ""
+
         print(
             f"{status_symbol} {inst.installment_number}. Installment #{inst.installment_number}: "
             f"{format_currency(inst.amount)} due {inst.due_date}{status_text}"
@@ -307,52 +326,81 @@ def mark_payment(context: NavigationContext) -> CommandResult:
 
     mark_as_paid = action == "1"
 
-    print("\nYou can select multiple installments (e.g., '1,2,3' or just '1')")
     if mark_as_paid:
-        installment_input = get_input("Select installment number(s) to mark as paid")
+        installment_input = get_input("Select installment number to pay")
     else:
+        print("\nYou can select multiple installments (e.g., '1,2,3' or just '1')")
         installment_input = get_input("Select installment number(s) to mark as unpaid")
 
     if not installment_input:
         return CommandResult(message="No installments selected.")
 
-    try:
-        selected_numbers = _parse_installment_numbers(installment_input)
-    except ValueError:
-        return CommandResult(message="Invalid input. Please use comma-separated numbers.")
-
-    try:
-        selected_installments = plan.get_installments(selected_numbers)
-    except ValueError as e:
-        return CommandResult(message=str(e))
-
-    for inst in selected_installments:
-        if mark_as_paid and inst.status == PaymentStatus.PAID:
-            print(f"Note: Installment #{inst.installment_number} is already marked as paid.")
-        elif not mark_as_paid and inst.status != PaymentStatus.PAID:
-            print(f"Note: Installment #{inst.installment_number} is already marked as unpaid.")
-
-    marked_count = 0
     if mark_as_paid:
-        for selected_inst in selected_installments:
-            paid_date = get_date_input(
-                f"Payment date for installment #{selected_inst.installment_number}", default=selected_inst.due_date
+        try:
+            inst_num = int(installment_input.strip())
+            selected_inst = plan.get_installment(inst_num)
+        except (ValueError, KeyError):
+            return CommandResult(message="Invalid installment number.")
+
+        if selected_inst.status == PaymentStatus.PAID:
+            return CommandResult(message=f"Installment #{selected_inst.installment_number} is already fully paid.")
+
+        print(f"\nInstallment #{selected_inst.installment_number}:")
+        print(f"  Total amount: {format_currency(selected_inst.amount)}")
+        if selected_inst.amount_paid > 0:
+            print(f"  Already paid: {format_currency(selected_inst.amount_paid)}")
+            print(f"  Remaining: {format_currency(selected_inst.remaining_amount)}")
+
+        payment_amount = get_decimal_input("Payment amount", default=selected_inst.remaining_amount)
+        if not payment_amount:
+            return CommandResult(message="No payment amount entered.")
+
+        if payment_amount > selected_inst.remaining_amount:
+            return CommandResult(
+                message=f"Payment amount exceeds remaining balance of {format_currency(selected_inst.remaining_amount)}."
             )
 
-            selected_inst.mark_paid(paid_date)
-            marked_count += 1
+        payment_date = get_date_input("Payment date", default=date.today())
 
-            print(f"✓ Installment #{selected_inst.installment_number} marked as paid on {paid_date}")
-
-        plan.updated_at = datetime.now()
-        plan_manager: PlanManager = context.get_data(ContextKeys.PLAN_MANAGER)
-        plan_manager.mark_as_modified()
-        return CommandResult(message=_format_marking_result(marked_count, "paid"))
+        try:
+            if payment_amount == selected_inst.remaining_amount:
+                selected_inst.mark_full_payment(payment_date)
+                plan.updated_at = datetime.now()
+                plan_manager: PlanManager = context.get_data(ContextKeys.PLAN_MANAGER)
+                plan_manager.mark_as_modified()
+                return CommandResult(
+                    message=f"\n✓ Installment #{selected_inst.installment_number} marked as paid on {payment_date}!"
+                )
+            else:
+                selected_inst.mark_partial_payment(payment_amount, payment_date)
+                plan.updated_at = datetime.now()
+                plan_manager: PlanManager = context.get_data(ContextKeys.PLAN_MANAGER)
+                plan_manager.mark_as_modified()
+                return CommandResult(
+                    message=f"\n◐ Partial payment of {format_currency(payment_amount)} recorded. "
+                    f"Remaining: {format_currency(selected_inst.remaining_amount)}"
+                )
+        except ValueError as e:
+            return CommandResult(message=str(e))
     else:
+        try:
+            selected_numbers = _parse_installment_numbers(installment_input)
+        except ValueError:
+            return CommandResult(message="Invalid input. Please use comma-separated numbers.")
+
+        try:
+            selected_installments = plan.get_installments(selected_numbers)
+        except ValueError as e:
+            return CommandResult(message=str(e))
+
+        for inst in selected_installments:
+            if inst.is_unpaid:
+                print(f"Note: Installment #{inst.installment_number} is already marked as unpaid.")
+
+        marked_count = 0
         for selected_inst in selected_installments:
             selected_inst.mark_unpaid()
             marked_count += 1
-
             print(f"○ Installment #{selected_inst.installment_number} marked as unpaid")
 
         plan.updated_at = datetime.now()
@@ -381,19 +429,25 @@ def format_payment_item(payment: PaymentInfo, show_days_info: bool = True) -> st
     :return: Formatted payment string (multi-line)
     """
     inst = payment.installment
-    lines = [f"  {payment.merchant} - Installment #{inst.installment_number}"]
+    partial_indicator = " ◐" if inst.is_partially_paid else ""
+    lines = [f"  {payment.merchant} - Installment #{inst.installment_number}{partial_indicator}"]
+
+    amount_display = format_currency(inst.remaining_amount) if inst.is_partially_paid else format_currency(inst.amount)
 
     if show_days_info:
         if payment.days_until_due < 0:
             days_overdue = abs(payment.days_until_due)
-            lines.append(f"    {format_currency(inst.amount)} ({days_overdue} days overdue)")
+            lines.append(f"    {amount_display} ({days_overdue} days overdue)")
         elif payment.days_until_due > 0:
             days_str = f"in {payment.days_until_due} {pluralize(payment.days_until_due, 'day')}"
-            lines.append(f"    {format_currency(inst.amount)} ({days_str})")
+            lines.append(f"    {amount_display} ({days_str})")
         else:
-            lines.append(f"    {format_currency(inst.amount)}")
+            lines.append(f"    {amount_display}")
     else:
-        lines.append(f"    {format_currency(inst.amount)}")
+        lines.append(f"    {amount_display}")
+
+    if inst.is_partially_paid:
+        lines.append(f"    [Paid: {format_currency(inst.amount_paid)} of {format_currency(inst.amount)}]")
 
     return "\n".join(lines)
 
@@ -429,24 +483,19 @@ def display_grouped_payments(
     print("-" * 50)
 
     for due_date, payments in payments_by_date.items():
-        # Show date header if there are multiple dates or multiple payments on this date
         if len(payments_by_date) > 1 or len(payments) > 1:
             print(format_payment_date_header(due_date))
 
-        # Display each payment
         for payment in payments:
             print(format_payment_item(payment, show_days_info))
 
-        # Show daily subtotal if multiple payments on same day
         if len(payments) > 1:
             daily_total = sum((p.installment.amount for p in payments), start=Decimal(0))
             print(format_daily_subtotal(daily_total))
 
-        # Add spacing between dates
         if len(payments_by_date) > 1:
             print()
 
-    # Final newline if we didn't already add spacing
     if len(payments_by_date) == 1:
         print()
 
@@ -492,24 +541,19 @@ def _display_payment_overview(stats: PaymentStatistics, categorized: Categorized
         print()
         payments_by_date = group_payments_by_date(categorized["upcoming"])
         for due_date, payments in payments_by_date.items():
-            # Show date header if there are multiple dates or multiple payments on this date
             if len(payments_by_date) > 1 or len(payments) > 1:
                 print(format_payment_date_header(due_date))
 
-            # Display each payment
             for payment in payments:
                 print(format_payment_item(payment, show_days_info=True))
 
-            # Show daily subtotal if multiple payments on same day
             if len(payments) > 1:
                 daily_total = sum((p.installment.amount for p in payments), start=Decimal(0))
                 print(format_daily_subtotal(daily_total))
 
-            # Add spacing between dates
             if len(payments_by_date) > 1:
                 print()
 
-        # Final newline if we didn't already add spacing
         if len(payments_by_date) == 1:
             print()
 
@@ -841,6 +885,60 @@ def edit_installment_paid_date(context: NavigationContext) -> CommandResult:
     )
 
 
+def edit_installment_amount_paid(context: NavigationContext) -> CommandResult:
+    """
+    Edit the amount paid for an installment.
+
+    :param context: Navigation context containing plan manager and edit plan ID
+    :return: CommandResult with update status message
+    """
+    print_heading("Edit Installment Amount Paid")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
+
+    plan_id = context.get_data(ContextKeys.EDIT_PLAN_ID)
+    plan = plan_manager.get_plan(plan_id) if plan_id else None
+
+    if not plan:
+        return CommandResult(message="No plan selected.")
+
+    installment = select_installment(plan)
+    if not installment:
+        return CommandResult(message="No installment selected.")
+
+    print(f"\nCurrent amount paid: {format_currency(installment.amount_paid)}")
+    print(f"Installment total: {format_currency(installment.amount)}")
+    print(f"Remaining: {format_currency(installment.remaining_amount)}")
+
+    new_amount_paid = get_decimal_input("New amount paid", default=None)
+    if new_amount_paid is None:
+        return CommandResult(message="Amount paid is required.")
+
+    if new_amount_paid < 0:
+        return CommandResult(message="Amount paid cannot be negative.")
+
+    if new_amount_paid > installment.amount:
+        return CommandResult(
+            message=f"Amount paid cannot exceed installment amount of {format_currency(installment.amount)}."
+        )
+
+    was_paid = installment.status == PaymentStatus.PAID
+    will_be_paid = new_amount_paid == installment.amount
+
+    if will_be_paid and not was_paid:
+        paid_date = get_date_input("Payment completion date", default=date.today())
+        installment.set_amount_paid(new_amount_paid)
+        installment.paid_date = paid_date
+    else:
+        installment.set_amount_paid(new_amount_paid)
+
+    plan.updated_at = datetime.now()
+    plan_manager.mark_as_modified()
+
+    return CommandResult(
+        message=f"\nInstallment #{installment.installment_number} amount paid updated to {format_currency(new_amount_paid)}"
+    )
+
+
 def delete_plan(context: NavigationContext) -> CommandResult:
     """
     Delete the current installment plan after confirmation.
@@ -899,7 +997,8 @@ def edit_plan_menu(context: NavigationContext) -> CommandResult:
     edit_menu.add_command("2", Command("Edit Installment Amount", edit_installment_amount))
     edit_menu.add_command("3", Command("Edit Installment Due Date", edit_installment_due_date))
     edit_menu.add_command("4", Command("Edit Installment Paid Date", edit_installment_paid_date))
-    edit_menu.add_command("5", Command("Delete Plan", delete_plan))
+    edit_menu.add_command("5", Command("Edit Installment Amount Paid", edit_installment_amount_paid))
+    edit_menu.add_command("6", Command("Delete Plan", delete_plan))
     edit_menu.add_back_command()
 
     return CommandResult(action=NavigationAction.PUSH, target_menu=edit_menu)
@@ -960,7 +1059,6 @@ def exit_without_saving(context: NavigationContext) -> CommandResult:
 
 
 def main() -> None:
-    # Use environment variable for storage path, fall back to default
     storage_path = os.environ.get("PIGGY_DATA_DIR")
     if storage_path:
         storage_dir = Path(storage_path)
