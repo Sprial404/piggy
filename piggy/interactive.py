@@ -206,6 +206,31 @@ def view_plan_details(context: NavigationContext) -> CommandResult:
     return CommandResult(wait_for_key=True)
 
 
+def get_installment_status_symbol(inst: Installment) -> str:
+    """
+    Get the status symbol for an installment.
+
+    :param inst: Installment to get symbol for
+    :return: Status symbol (✓ for paid, ◐ for partially paid, ○ for unpaid)
+    """
+    if inst.status == PaymentStatus.PAID:
+        return "✓"
+    elif inst.is_partially_paid:
+        return "◐"
+    else:
+        return "○"
+
+
+def get_plan_status_icon(plan: InstallmentPlan) -> str:
+    """
+    Get the status icon for a plan.
+
+    :param plan: InstallmentPlan to get icon for
+    :return: Status icon (✓ for fully paid, ○ for unpaid)
+    """
+    return "✓" if plan.is_fully_paid else "○"
+
+
 def format_installment_line(
     inst: Installment, show_status: bool = False, show_paid_date_inline: bool = False, indent: str = "  "
 ) -> str:
@@ -218,13 +243,7 @@ def format_installment_line(
     :param indent: Indentation string
     :return: Formatted installment line
     """
-    if inst.status == PaymentStatus.PAID:
-        status_symbol = "✓"
-    elif inst.is_partially_paid:
-        status_symbol = "◐"
-    else:
-        status_symbol = "○"
-
+    status_symbol = get_installment_status_symbol(inst)
     line = f"{indent}{status_symbol} #{inst.installment_number}: {format_currency(inst.amount)} due {inst.due_date}"
 
     if inst.is_partially_paid:
@@ -247,16 +266,15 @@ def _display_installments(plan: InstallmentPlan) -> None:
     """
     print("\nAll installments:")
     for inst in plan.installments:
+        status_symbol = get_installment_status_symbol(inst)
+
         if inst.status == PaymentStatus.PAID:
-            status_symbol = "✓"
             status_text = f" [PAID on {inst.paid_date}]"
         elif inst.is_partially_paid:
-            status_symbol = "◐"
             status_text = (
                 f" [Paid: {format_currency(inst.amount_paid)}, Remaining: {format_currency(inst.remaining_amount)}]"
             )
         else:
-            status_symbol = "○"
             status_text = ""
 
         print(
@@ -602,6 +620,108 @@ def _save_all_plans(plan_manager: PlanManager) -> tuple[int, list[str]]:
         print(error)
 
     return saved_count, errors
+
+
+def search_filter_plans(context: NavigationContext) -> CommandResult:
+    """
+    Search and filter installment plans with various criteria.
+
+    :param context: Navigation context containing plan manager
+    :return: CommandResult with filtered plans display
+    """
+    from piggy.analytics import (
+        filter_plans_by_amount,
+        filter_plans_by_date,
+        filter_plans_by_merchant,
+        filter_plans_by_status,
+    )
+
+    print_heading("Search & Filter Plans")
+    plan_manager = context.get_data(ContextKeys.PLAN_MANAGER)
+
+    if not plan_manager.plans:
+        return CommandResult(message="No installment plans available.")
+
+    print("\nFilter Options:")
+    print("1. Search by merchant name")
+    print("2. Filter by payment status")
+    print("3. Filter by amount range")
+    print("4. Filter by date range")
+    print("5. Show all plans")
+    print()
+
+    choice = get_input("Select filter option", default="5")
+
+    filtered_plans = dict(plan_manager.plans)
+
+    if choice == "1":
+        merchant_query = get_input("Enter merchant name (partial match)")
+        if merchant_query:
+            filtered_plans = filter_plans_by_merchant(filtered_plans, merchant_query)
+
+    elif choice == "2":
+        print("\nStatus filters:")
+        print("1. Only fully paid plans")
+        print("2. Only unpaid plans")
+        print("3. Only plans with overdue payments")
+        print("4. Only plans without overdue payments")
+        status_choice = get_input("Select status filter", default="")
+
+        if status_choice == "1":
+            filtered_plans = filter_plans_by_status(filtered_plans, fully_paid=True)
+        elif status_choice == "2":
+            filtered_plans = filter_plans_by_status(filtered_plans, fully_paid=False)
+        elif status_choice == "3":
+            filtered_plans = filter_plans_by_status(filtered_plans, has_overdue=True)
+        elif status_choice == "4":
+            filtered_plans = filter_plans_by_status(filtered_plans, has_overdue=False)
+
+    elif choice == "3":
+        print("\nAmount range:")
+        min_total = get_decimal_input("Minimum total amount (leave empty for no minimum)", default=None)
+        max_total = get_decimal_input("Maximum total amount (leave empty for no maximum)", default=None)
+        min_remaining = get_decimal_input("Minimum remaining balance (leave empty for no minimum)", default=None)
+        max_remaining = get_decimal_input("Maximum remaining balance (leave empty for no maximum)", default=None)
+
+        filtered_plans = filter_plans_by_amount(
+            filtered_plans,
+            min_total=min_total,
+            max_total=max_total,
+            min_remaining=min_remaining,
+            max_remaining=max_remaining,
+        )
+
+    elif choice == "4":
+        print("\nDate range:")
+        purchase_after = get_date_input("Purchase date after (leave empty for no filter)", default=None)
+        purchase_before = get_date_input("Purchase date before (leave empty for no filter)", default=None)
+        next_payment_after = get_date_input("Next payment after (leave empty for no filter)", default=None)
+        next_payment_before = get_date_input("Next payment before (leave empty for no filter)", default=None)
+
+        filtered_plans = filter_plans_by_date(
+            filtered_plans,
+            purchase_after=purchase_after,
+            purchase_before=purchase_before,
+            next_payment_after=next_payment_after,
+            next_payment_before=next_payment_before,
+        )
+
+    print(f"\n{len(filtered_plans)} plan(s) found:")
+    print("-" * 50)
+
+    if not filtered_plans:
+        return CommandResult(message="No plans match the filter criteria.")
+
+    for plan in filtered_plans.values():
+        status_icon = get_plan_status_icon(plan)
+        overdue_marker = " ⚠" if plan.has_overdue_payments else ""
+        print(f"{status_icon} {plan.merchant_name}{overdue_marker}")
+        print(f"   Total: {format_currency(plan.total_amount)} | Remaining: {format_currency(plan.remaining_balance)}")
+        if plan.next_payment_due:
+            print(f"   Next payment: {plan.next_payment_due}")
+        print()
+
+    return CommandResult(message=f"\nShowing {len(filtered_plans)} of {len(plan_manager.plans)} total plans.")
 
 
 def save_plans(context: NavigationContext) -> CommandResult:
@@ -1076,7 +1196,8 @@ def main() -> None:
     main_menu.add_command("2", Command("List All Plans", list_installment_plans))
     main_menu.add_command("3", Command("View Plan Details", view_plan_details))
     main_menu.add_command("4", Command("Mark Payment", mark_payment))
-    main_menu.add_command("5", Command("Edit Plan", edit_plan_menu))
+    main_menu.add_command("5", Command("Search & Filter Plans", search_filter_plans))
+    main_menu.add_command("6", Command("Edit Plan", edit_plan_menu))
 
     data_menu = Menu("Data Management")
     data_menu.add_command("1", Command("Save Plans", save_plans))
@@ -1084,7 +1205,7 @@ def main() -> None:
     data_menu.add_command("3", Command("Export Plan to CSV", export_plan_csv))
     data_menu.add_back_command()
 
-    main_menu.add_submenu("6", data_menu)
+    main_menu.add_submenu("7", data_menu)
     main_menu.add_command("e", Command("Save and Exit", save_and_exit))
     main_menu.add_command("q", Command("Exit without Saving", exit_without_saving))
 
