@@ -144,3 +144,104 @@ def calculate_payment_statistics(
         "due_today_total": due_today_total,
         "time_period_totals": time_period_totals,
     }
+
+
+def filter_plans_by_merchant(plans_dict: dict[str, InstallmentPlan], merchant_query: str) -> dict[str, InstallmentPlan]:
+    """
+    Filter plans by merchant name (case-insensitive partial match).
+
+    :param plans_dict: Dictionary of plan_id -> InstallmentPlan
+    :param merchant_query: Search query for merchant name
+    :return: Filtered dictionary of plans
+    """
+    query_lower = merchant_query.lower()
+    return {plan_id: plan for plan_id, plan in plans_dict.items() if query_lower in plan.merchant_name.lower()}
+
+
+def filter_plans_by_status(
+    plans_dict: dict[str, InstallmentPlan], fully_paid: bool | None = None, has_overdue: bool | None = None
+) -> dict[str, InstallmentPlan]:
+    """
+    Filter plans by payment status.
+
+    :param plans_dict: Dictionary of plan_id -> InstallmentPlan
+    :param fully_paid: If True, only fully paid plans; if False, only unpaid plans; if None, no filter
+    :param has_overdue: If True, only plans with overdue payments; if False, only plans without overdue; if None, no filter
+    :return: Filtered dictionary of plans
+    """
+    result = plans_dict
+
+    if fully_paid is not None:
+        result = {plan_id: plan for plan_id, plan in result.items() if plan.is_fully_paid == fully_paid}
+
+    if has_overdue is not None:
+        result = {plan_id: plan for plan_id, plan in result.items() if plan.has_overdue_payments == has_overdue}
+
+    return result
+
+
+def filter_plans_by_amount(
+    plans_dict: dict[str, InstallmentPlan],
+    min_total: Decimal | None = None,
+    max_total: Decimal | None = None,
+    min_remaining: Decimal | None = None,
+    max_remaining: Decimal | None = None,
+) -> dict[str, InstallmentPlan]:
+    """
+    Filter plans by amount ranges.
+
+    :param plans_dict: Dictionary of plan_id -> InstallmentPlan
+    :param min_total: Minimum total amount
+    :param max_total: Maximum total amount
+    :param min_remaining: Minimum remaining balance
+    :param max_remaining: Maximum remaining balance
+    :return: Filtered dictionary of plans
+    """
+    result = {}
+    for plan_id, plan in plans_dict.items():
+        if min_total is not None and plan.total_amount < min_total:
+            continue
+        if max_total is not None and plan.total_amount > max_total:
+            continue
+        if min_remaining is not None and plan.remaining_balance < min_remaining:
+            continue
+        if max_remaining is not None and plan.remaining_balance > max_remaining:
+            continue
+        result[plan_id] = plan
+
+    return result
+
+
+def filter_plans_by_date(
+    plans_dict: dict[str, InstallmentPlan],
+    purchase_after: date | None = None,
+    purchase_before: date | None = None,
+    next_payment_after: date | None = None,
+    next_payment_before: date | None = None,
+) -> dict[str, InstallmentPlan]:
+    """
+    Filter plans by date ranges.
+
+    :param plans_dict: Dictionary of plan_id -> InstallmentPlan
+    :param purchase_after: Only plans purchased after this date
+    :param purchase_before: Only plans purchased before this date
+    :param next_payment_after: Only plans with next payment after this date
+    :param next_payment_before: Only plans with next payment before this date
+    :return: Filtered dictionary of plans
+    """
+    result = {}
+    for plan_id, plan in plans_dict.items():
+        if purchase_after is not None and plan.purchase_date < purchase_after:
+            continue
+        if purchase_before is not None and plan.purchase_date > purchase_before:
+            continue
+
+        next_payment = plan.next_payment_due
+        if next_payment_after is not None and (next_payment is None or next_payment < next_payment_after):
+            continue
+        if next_payment_before is not None and (next_payment is None or next_payment > next_payment_before):
+            continue
+
+        result[plan_id] = plan
+
+    return result
